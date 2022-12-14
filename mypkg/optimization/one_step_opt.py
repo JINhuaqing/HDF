@@ -38,7 +38,6 @@ class OneStepOpt():
                 theta_init: The initial value of theta, vec of q+dN
                             Note theta = [alp, Gam/sqrt(N)]
                 paras: other parameters
-                    q: num of covariate, if theta_init is None, you should give q
                     R: The radius of the projection space
                     NR_eps: the stop criteria for Newton-Ralpson method
                     NR_maxit: the max num of iterations for Newton-Ralpson method
@@ -47,7 +46,7 @@ class OneStepOpt():
         self.N, self.d = Gamk.shape
         assert len(rhok) == self.N * self.d
         if theta_init is None:
-            self.q = paras.q
+            self.q = model.Z.shape[-1]
             theta_init = torch.randn(self.q+self.d*self.N)
         else:
             self.q = len(theta_init) - self.N*self.d
@@ -59,6 +58,7 @@ class OneStepOpt():
         self.Gamk = Gamk
         self.rhok = rhok
         self.thetak = None
+        self.alpk = None
         
         self.D = gen_Dmat(self.d, self.N, self.q)
         self.beta = beta
@@ -133,3 +133,4 @@ class OneStepOpt():
         self._update_rho()
         self._update_Gam()
         self._update_rho()
+        self.alpk = self.thetak[:self.q]

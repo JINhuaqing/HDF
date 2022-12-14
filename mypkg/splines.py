@@ -25,3 +25,20 @@ def obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept=1):
                   Boundary_knots=bknots_rvec, 
                   intercept=intercept)
     return np.matrix(bsis_r)
+
+
+
+def obt_bsp_basis_Rfn_wrapper(x, N, bsp_ord, intercept=1):
+    """
+        Obtain the b-spline basis for given Num of basis and degree
+        args:
+            x: the locs you want to evaluate
+            N: Num of basis
+            bsp_ord: the order of b-spline; degree = order-1
+            intercept: whether including intercept or not, i.e., the first col of the basis
+    """
+    aknots_raw = np.linspace(0, 1, N-2)
+    iknots = aknots_raw[1:-1]
+    bknots = np.array([0, 1])
+    basis_mat = obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord)
+    return basis_mat
