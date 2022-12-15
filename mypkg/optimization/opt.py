@@ -77,7 +77,7 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, **input_
             last_thetak = opt.thetak
         
     if ix == (_paras.max_iter-1):
-        print(f"The optimization under seed {seed} may not converge with stop value {stop_v:.3f}")
+        print(f"The optimization may not converge with stop value {stop_v:.3f}")
     if _paras.is_small:
         opt.model = None
     if save_paras:
