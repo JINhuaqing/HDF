@@ -22,7 +22,7 @@ def gen_simu_psd(M, d, num_sel, noise_sd=0.2):
     """
     simu_psd = []
     for roi_idx in range(d):
-        roi_dat = np.log10(_data.psd[roi_idx])
+        roi_dat = np.log10(_data.psd[roi_idx%68]) # if d > 68, from 0 again
         
         std_logp = roi_dat.std(axis=0)
         

@@ -7,7 +7,7 @@ from optimization.one_step_opt import OneStepOpt
 from utils.matrix import  col_vec2mat_fn
 
 
-def optimization(model, penalty, inits, is_prg=False, save_paras=False, **input_paras):
+def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_paras={}):
     """The function to do the optimization
         args:
             model: likelihood model: LogisticModel or LinearModel
@@ -28,8 +28,7 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, **input_
               'stop_cv': 0.0005,
               'max_iter': 2000}
     _paras = edict(_paras)
-    for key in input_paras:
-        _paras[key] = input_paras[key]
+    _paras.update(input_paras)
     _paras.q = model.Z.shape[-1]
     _paras.N = model.basis_mat.shape[-1]
         

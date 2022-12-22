@@ -8,7 +8,7 @@ from hdf_utils.likelihood import obt_lin_tm
 from optimization.opt import optimization
 
 
-def CV_err_linear_fn(data, num_cv_fold, penalty, inits, is_prg=False, save_paras=False, **input_paras):
+def CV_err_linear_fn(data, num_cv_fold, penalty, inits, is_prg=False, save_paras=False, input_paras={}):
     """This fn is to do the cross validation for select parameters for the optimization procedure 
        for linear model
         args:
@@ -63,9 +63,12 @@ def CV_err_linear_fn(data, num_cv_fold, penalty, inits, is_prg=False, save_paras
         cur_model = LinearModel(Y=train_set_Y, X=train_set_X, Z=train_set_Z, 
                         basis_mat=_paras.basis_mat, 
                         sigma2=_paras.sigma2)
-        res = optimization(model=cur_model, penalty=penalty, 
+        res = optimization(model=cur_model, 
+                           penalty=penalty, 
                            inits=[alp_init, Gam_init, theta_init, rhok_init], 
-                           **_paras)
+                           is_prg=False,
+                           save_paras=False,
+                           input_paras=_paras)
         alp_est = res[0].alpk
         gam_est = res[0].Gamk
         test_Y_est = obt_lin_tm(test_set_Z, test_set_X, alp_est, gam_est, _paras.basis_mat)
