@@ -18,6 +18,7 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
                 is_small: Whether remove model or not after optmization. If not, the output can be very large
         
     """
+    eps = 1e-10 # a small number to avoid divided-by-zero issue
     # default parameters
     _paras = {
               'is_small': True,
@@ -35,6 +36,7 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
     last_Gamk = 0
     last_rhok = 0
     last_thetak = 0
+    last_alpk = 0
     alp_init, Gam_init, theta_init, rhok_init = inits
     if is_prg:
         prg_bar = trange(_paras.max_iter)
@@ -58,19 +60,26 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
             
             
             # converge cv
+            alp_diff = opt.alpk - last_alpk
+            alp_diff_norm = torch.norm(alp_diff)/(torch.norm(opt.alpk)+eps)
+            
             Gam_diff = opt.Gamk- last_Gamk
-            Gam_diff_norm = torch.norm(Gam_diff)/torch.norm(opt.Gamk)
+            Gam_diff_norm = torch.norm(Gam_diff)/(torch.norm(opt.Gamk)+eps)
             
             theta_diff = opt.thetak - last_thetak
-            theta_diff_norm = torch.norm(theta_diff)/torch.norm(opt.thetak)
+            theta_diff_norm = torch.norm(theta_diff)/(torch.norm(opt.thetak)+eps)
             
             Gam_theta_diff = opt.Gamk - col_vec2mat_fn(opt.thetak[_paras.q:], nrow=_paras.N)*np.sqrt(_paras.N)
-            Gam_theta_diff_norm = torch.norm(Gam_theta_diff)/torch.norm(opt.Gamk)
+            Gam_theta_diff_norm = torch.norm(Gam_theta_diff)/(torch.norm(opt.Gamk)+eps)
             
-            stop_v = np.max([Gam_diff_norm.item(), theta_diff_norm.item(), Gam_theta_diff_norm.item()])
+            stop_v = np.max([alp_diff_norm.item(),
+                             Gam_diff_norm.item(), 
+                             theta_diff_norm.item(), 
+                             Gam_theta_diff_norm.item()])
             if stop_v < _paras.stop_cv:
                 break
                 
+            last_alpk = opt.alpk
             last_Gamk = opt.Gamk
             last_rhok = opt.rhok
             last_thetak = opt.thetak
