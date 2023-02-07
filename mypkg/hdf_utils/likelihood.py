@@ -4,14 +4,14 @@ import torch
 def obt_lin_tm(Z, X, alp, Gam, basis_mat, ws=None):
     """Give the linear terms of likelihood fn
        args: 
-           Z: matrix or vector of other covariates, (M) x q
-           X: freq of data: (M) x d x npts
+           Z: matrix or vector of other covariates, (n) x q
+           X: freq of data: (n) x d x npts
            alp: parameters for Z: q
            Gam: parameters of B-spline: N x d
            basis_mat: Basis matrix of B-spline evaluated at some pts: npts x N
            ws: the weights used for approximating the integration: npts. 
         return:
-           lin_tm: the linear terms: scalar or vector of M
+           lin_tm: the linear terms: scalar or vector of n
     """
     assert X.dim() == Z.dim() + 1
     if X.dim() == 2:

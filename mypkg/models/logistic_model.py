@@ -19,12 +19,13 @@ class LogisticModel(BaseModel):
         
         if self.lin_tm_der is None:
             self._linear_term_der()
-        tm2 = self.lin_tm_der #M x (q+dxN)
-        #M x (q+dxN)
+        tm2 = self.lin_tm_der #n x (q+dxN)
+        #n x (q+dxN)
         
-        tm1 = self.Y - torch.exp(Os)/(1+torch.exp(Os)) # M
+        tm1 = self.Y - torch.exp(Os)/(1+torch.exp(Os)) # n
         
-        log_lik_der1_vs = tm1.unsqueeze(-1) * tm2 #M x (q+dxN)
+        log_lik_der1_vs = tm1.unsqueeze(-1) * tm2 #n x (q+dxN)
+        self.log_lik_der1_vs = log_lik_der1_vs
         log_lik_der1_v = log_lik_der1_vs.mean(axis=0) # (q+dxN)
         return log_lik_der1_v
     
@@ -33,11 +34,11 @@ class LogisticModel(BaseModel):
         """
         Os = self._obt_lin_tm(alp, Gam) # linear term
         
-        tm1 = - torch.exp(Os)/((1+torch.exp(Os))**2) #M
+        tm1 = - torch.exp(Os)/((1+torch.exp(Os))**2) #n
 
         if self.lin_tm_der is None:
             self._linear_term_der()
-        tm2 = self.lin_tm_der #M x (q+dxN)
+        tm2 = self.lin_tm_der #n x (q+dxN)
         
         log_lik_der2_vs = tm1.unsqueeze(-1).unsqueeze(-1) * tm2.unsqueeze(1) * tm2.unsqueeze(2)
         log_lik_der2_v = log_lik_der2_vs.mean(axis=0) # (q+dxN) x (q+dxN)

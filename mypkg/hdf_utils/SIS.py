@@ -12,14 +12,14 @@ def SIS_linear(Y, X, Z, keep_ratio=0.3, input_paras={}):
             Z: Covariates
             keep_ratio: The ratio between the keeped rois and all rois
             input_paras: Other parameters, 
-                         require: d, basis_mat, N, q
+                         require: sel_idx, basis_mat, N, q
     """
     _paras = edict(input_paras.copy())
     
-    num_kp = int(np.round(_paras.d*keep_ratio, 0))
+    num_kp = int(np.round(len(_paras.sel_idx)*keep_ratio, 0))
     
     SIS_gams = []
-    for ix in range(_paras.d):
+    for ix in _paras.sel_idx:
         cur_X = X[:, ix, :].unsqueeze(-1)
         tmp_BX = (cur_X * _paras.basis_mat).mean(axis=1)
         vec_p2 = tmp_BX*np.sqrt(_paras.N)
@@ -32,5 +32,5 @@ def SIS_linear(Y, X, Z, keep_ratio=0.3, input_paras={}):
     SIS_gams = np.array(SIS_gams)
     SIS_betas = _paras.basis_mat.numpy() @ SIS_gams.T
     norm_vs =  np.sqrt(np.mean(SIS_betas**2, axis=0))
-    keep_idxs = np.argsort(-norm_vs)[:num_kp]
-    return keep_idxs, norm_vs
+    keep_idxs = np.sort(np.argsort(-norm_vs)[:num_kp])
+    return _paras.sel_idx[keep_idxs], norm_vs
