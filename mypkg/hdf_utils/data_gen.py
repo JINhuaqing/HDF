@@ -3,16 +3,50 @@ import numpy as np
 from numbers import Number
 from pathlib import Path
 from utils.misc import load_pkl
+from tqdm import trange
 from constants import DATA_ROOT
+from joblib import Parallel, delayed
+from hdf_utils.data_gen_utils import get_dist, get_sc_my
+from hdf_utils.sgm import SGM
 
-AD_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/AD88_all.pkl")
-Ctrl_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/Ctrl92_all.pkl")
-ts_data = np.concatenate([AD_ts, Ctrl_ts], axis=0)
-std_ts_data = (ts_data - ts_data.mean(axis=2)[:, :, np.newaxis])/ts_data.std(axis=2)[:, :, np.newaxis]
+#AD_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/AD88_all.pkl")
+#Ctrl_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/Ctrl92_all.pkl")
+#ts_data = np.concatenate([AD_ts, Ctrl_ts], axis=0)
+#std_ts_data = (ts_data - ts_data.mean(axis=2)[:, :, np.newaxis])/ts_data.std(axis=2)[:, :, np.newaxis]
 #_cur_dir = Path(__file__).parent
 #_database_dir = Path(_cur_dir/"../../data/fooof_data_ADvsCtrl")
-#_database_fil = Path(_cur_dir/"../../data/ctrl_vs_AD_nooutlier.pkl")
-#_data = load_pkl(_database_fil)
+
+def gen_simu_psd(n, d, freqs, prior_sd=10, n_jobs=1, is_prog=False):
+    """
+    Generate simulated power spectral density (PSD) data.
+
+    Args:
+        n (int): Number of samples to generate.
+        d (int): Number of regions of interest (ROIs).
+        freqs (array-like): A vector of frequencies, in Hz.
+        prior_sd (float, optional): The prior standard deviation of the SGM parameters. Default is 10.
+        n_jobs (int, optional): Number of jobs to generate the data. Default is 1.
+        is_prog (bool, optional): Whether to show progress bar or not. Default is False.
+
+    Returns:
+        psds (numpy.ndarray): An n x d x len(freqs) array of simulated PSD data.
+    """
+    C = get_sc_my(d);
+    D = get_dist(d);
+    sgmmodel = SGM(C, D, freqs=freqs);
+    cur_parass = np.random.randn(n, 7)*prior_sd
+    def fun(ix):
+        cur_psd = sgmmodel(cur_parass[ix])
+        return cur_psd
+    if is_prog:
+        pbar = trange(n)
+    else:
+        pbar = range(n)
+    with Parallel(n_jobs=n_jobs) as parallel:
+        psds = parallel(delayed(fun)(i) for i in pbar)
+    #psds = Parallel(n_jobs=n_jobs)(delayed(fun)(i) for i in pbar);
+    psds = np.array(psds)
+    return psds
 
 def obt_maskmat(sel_seqs):
     """Return the mask matrix for generating new MEG data
@@ -55,7 +89,7 @@ def gen_ts_single(base_data, num_sel, sub_idx):
     
     return simu_seq
 
-def gen_simu_ts(n, d, num_sel, base_data=None, decimate_rate=10):
+def gen_simu_ts(n, d, num_sel, base_data=None, decimate_rate=10, verbose=False):
     """generate time_series data based on AD vs ctrl
         args:
             n: Num of sps to generate
@@ -68,7 +102,11 @@ def gen_simu_ts(n, d, num_sel, base_data=None, decimate_rate=10):
     if base_data is None:
         base_data = std_ts_data[:, :, ::decimate_rate]
     simu_tss = []
-    for ix in range(n):
+    if verbose:
+        pbar = trange(n)
+    else:
+        pbar = range(n)
+    for ix in pbar:
         sel_sub_idx = np.random.choice(base_data.shape[0], 1)
         cur_ts = []
         for iy in range(d):
@@ -79,7 +117,7 @@ def gen_simu_ts(n, d, num_sel, base_data=None, decimate_rate=10):
 
 
 
-def gen_covs(n, types_):
+def gen_covs(n, types_, std_con=True):
     """Generate the covariates for simulated datasets
         args:
             n: The num of obs to generate
@@ -96,6 +134,8 @@ def gen_covs(n, types_):
             type_ = type_.lower()
             if type_.startswith("c"):
                 cur_cov = np.random.randn(n)
+                if std_con: 
+                    cur_cov = (cur_cov-cur_cov.mean())/cur_cov.std()
             elif type_.startswith("int"):
                 cur_cov = np.ones(n)
             else:

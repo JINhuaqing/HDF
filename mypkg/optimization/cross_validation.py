@@ -50,6 +50,8 @@ def CV_err_linear_fn(data, num_cv_fold, penalty, inits, is_prg=False, save_paras
         prg_bar = range(num_cv_fold)
     for ix in prg_bar:
         test_idx = full_idx[(ix*num_test):(ix*num_test+num_test)]
+        if ix == num_cv_fold-1:
+            test_idx = full_idx[(ix*num_test):] # including all remaining data
         train_idx = np.delete(full_idx, test_idx)
         
         test_set_X = data.X[test_idx]

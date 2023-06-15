@@ -129,7 +129,7 @@ class OneStepOpt():
         if isinstance(self.model, LinearModel):
             self._update_theta_linearmodel()
         else:
-            self._update_theta()
+            self._update_theta_linearmodel()
         self._update_rho()
         self._update_Gam()
         self._update_rho()

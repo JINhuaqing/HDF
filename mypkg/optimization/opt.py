@@ -79,6 +79,13 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
             if stop_v < _paras.stop_cv:
                 break
                 
+            if is_prg:
+                if ix % 10 == 0:
+                    prg_bar.set_postfix({'error': stop_v, 
+                                         'GamL0': torch.sum(torch.norm(opt.Gamk, dim=0)!=0).item(),
+                                         "CV":_paras.stop_cv}, 
+                                        refresh=True)
+                
             last_alpk = opt.alpk
             last_Gamk = opt.Gamk
             last_rhok = opt.rhok

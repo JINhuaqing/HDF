@@ -25,7 +25,7 @@ class PenaltyBase():
         
         if isinstance(self.lams, numbers.Number):
             self.lams = torch.ones(len(self.sel_idx))*self.lams
-            self.lams = self.lams.double()
+            self.lams = self.lams.to(torch.get_default_dtype())
             
         if isinstance(self.lams, np.ndarray):
             self.lams = torch.tensor(self.lams)

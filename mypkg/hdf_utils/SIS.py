@@ -3,7 +3,7 @@ import numpy as np
 from easydict import EasyDict as edict
 import torch
 
-def SIS_linear(Y, X, Z, keep_ratio=0.3, input_paras={}):
+def SIS_linear(Y, X, Z, keep_ratio=0.3, input_paras={}, ridge_pen=1):
     """The function is to do the sure ind screening when d (num of ROIs) is large under linear model
        Ref to Fan_and_Lv_JRSSB_2008
        args:
@@ -11,6 +11,7 @@ def SIS_linear(Y, X, Z, keep_ratio=0.3, input_paras={}):
             X: The psd 
             Z: Covariates
             keep_ratio: The ratio between the keeped rois and all rois
+            ridge_pen: A constant added for ridge reg
             input_paras: Other parameters, 
                          require: sel_idx, basis_mat, N, q
     """
@@ -27,6 +28,8 @@ def SIS_linear(Y, X, Z, keep_ratio=0.3, input_paras={}):
         
         right_vec = torch.sum(vec_p * Y.unsqueeze(-1), axis=0)
         left_mat = torch.sum(vec_p.unsqueeze(-1) * vec_p.unsqueeze(1), axis=0)
+        # ridge penalty
+        left_mat = left_mat + torch.eye(left_mat.shape[0])*ridge_pen
         cur_gam = torch.linalg.solve(left_mat, right_vec)[_paras.q:] * np.sqrt(_paras.N)
         SIS_gams.append(cur_gam.numpy())
     SIS_gams = np.array(SIS_gams)
