@@ -1,1 +1,28 @@
 Running prime number generator program on 30 CPU cores
+/opt/conda/lib/python3.9/site-packages/scipy/__init__.py:146: UserWarning: A NumPy version >=1.16.5 and <1.23.0 is required for this version of SciPy (detected version 1.24.3
+  warnings.warn(f"A NumPy version >={np_minversion} and <{np_maxversion}"
+Load file /data/rajlab1/user_data/jin/MyResearch/HDF_infer/bash_scripts/../mypkg/../data/AD_vs_Ctrl_PSD/AD88_PSD89_all.pkl
+Load file /data/rajlab1/user_data/jin/MyResearch/HDF_infer/bash_scripts/../mypkg/../data/AD_vs_Ctrl_PSD/Ctrl92_PSD89_all.pkl
+(157, 68, 89) (157,) (157, 3)
+The number of B-spline basis is 8.
+  0%|          | 0/748 [00:00<?, ?it/s]  3%|▎         | 20/748 [00:00<00:13, 52.80it/s]  3%|▎         | 20/748 [00:19<00:13, 52.80it/s]  5%|▌         | 40/748 [35:22<12:16:33, 62.42s/it]Traceback (most recent call last):
+  File "/data/rajlab1/user_data/jin/MyResearch/HDF_infer/python_scripts/real_data_run1.py", line 470, in <module>
+    ress = parallel(delayed(_run_fn)(seed, lam, [int(roi_idx)]) for lam, roi_idx in tqdm(all_coms))
+  File "/opt/conda/lib/python3.9/site-packages/joblib/parallel.py", line 1098, in __call__
+    self.retrieve()
+  File "/opt/conda/lib/python3.9/site-packages/joblib/parallel.py", line 975, in retrieve
+    self._output.extend(job.get(timeout=self.timeout))
+  File "/opt/conda/lib/python3.9/site-packages/joblib/_parallel_backends.py", line 567, in wrap_future_result
+    return future.result(timeout=timeout)
+  File "/opt/conda/lib/python3.9/concurrent/futures/_base.py", line 445, in result
+  File "/opt/conda/lib/python3.9/concurrent/futures/_base.py", line 390, in __get_result
+joblib.externals.loky.process_executor.TerminatedWorkerError: A worker process managed by the executor was unexpectedly terminated. This could be caused by a segmentation fault while calling the function or by an excessive memory usage causing the Operating System to kill the worker.
+
+The exit codes of the workers are {SIGBUS(-7)}
+R[write to console]: Warning messages:
+
+R[write to console]: 1: system call failed: No such file or directory 
+
+R[write to console]: 2: system call failed: No such file or directory 
+
+/var/spool/slurm/slurmd/job1154316/slurm_script: line 12:  1733 Bus error               singularity exec ~/jin/singularity_containers/hdf_latest.sif python -u /data/rajlab1/user_data/jin/MyResearch/HDF_infer/python_scripts/real_data_run1.py

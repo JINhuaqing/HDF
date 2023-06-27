@@ -15,6 +15,7 @@ def obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept=1):
             bknots: boundary knots
             bsp_ord: the order of b-spline; degree = order-1
             intercept: whether including intercept or not, i.e., the first col of the basis
+                       it means the intercept of the polynomial.
     """
     iknots_rvec = robj.FloatVector(iknots)
     bknots_rvec = robj.FloatVector(bknots)
@@ -36,9 +37,10 @@ def obt_bsp_basis_Rfn_wrapper(x, N, bsp_ord, intercept=1):
             N: Num of basis
             bsp_ord: the order of b-spline; degree = order-1
             intercept: whether including intercept or not, i.e., the first col of the basis
+                       it means the intercept of the polynomial.
     """
     aknots_raw = np.linspace(0, 1, N-(bsp_ord-2))
     iknots = aknots_raw[1:-1]
     bknots = np.array([0, 1])
-    basis_mat = obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord)
-    return basis_mat
+    basis_mat = obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept)
+    return np.array(basis_mat)
