@@ -1,0 +1,51 @@
+Load file /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/../mypkg/../data/AD_vs_Ctrl_PSD/AD88_PSD100_all.pkl
+Load file /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/../mypkg/../data/AD_vs_Ctrl_PSD/Ctrl70_PSD100_all.pkl
+(157, 68, 100) (157,) (157, 3)
+The number of B-spline basis is 8.
+The optimization may not converge with stop value 1.427E-04
+The optimization may not converge with stop value 1.936E-04
+The optimization may not converge with stop value 7.865E-05
+The optimization may not converge with stop value 1.426E-04
+The optimization may not converge with stop value 1.996E-04
+The optimization may not converge with stop value 1.426E-04
+The optimization may not converge with stop value 7.870E-05
+The optimization may not converge with stop value 2.027E-04
+The optimization may not converge with stop value 2.017E-04
+The optimization may not converge with stop value 7.864E-05
+The optimization may not converge with stop value 8.665E-05
+The optimization may not converge with stop value 1.936E-04
+The optimization may not converge with stop value 8.665E-05
+==============================================================
+job_number:                 9406257
+exec_file:                  job_scripts/9406257
+submission_time:            Thu Jun 15 21:19:09 2023
+owner:                      hjin
+uid:                        1646
+group:                      rajlab
+gid:                        1226
+sge_o_home:                 /wynton/home/rajlab/hjin
+sge_o_log_name:             hjin
+sge_o_path:                 /salilab/diva1/home/anaconda/anaconda3/bin:/salilab/diva1/home/anaconda/anaconda3/condabin:/opt/sge/bin:/opt/sge/bin/lx-amd64:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/wynton/home/rajlab/hjin/.local/bin:/wynton/home/rajlab/hjin/bin
+sge_o_shell:                /bin/bash
+sge_o_workdir:              /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/wynton
+sge_o_host:                 log1
+account:                    sge
+cwd:                        /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/
+stderr_path_list:           NONE:NONE:wynton/logs/$JOB_NAME_$JOB_ID.err
+hard resource_list:         rocky8=false,mem_free=2G,h_rt=172800,scratch=2G
+mail_list:                  hjin@log1
+notify:                     FALSE
+job_name:                   Realdata100
+stdout_path_list:           NONE:NONE:wynton/logs/$JOB_NAME_$JOB_ID.out
+jobshare:                   0
+hard_queue_list:            !*gpu.q
+shell_list:                 NONE:/bin/bash
+env_list:                   TERM=NONE
+script_file:                real_data_run.sh
+parallel environment:  smp range: 30
+project:                    surbecklab
+binding:                    NONE
+job_type:                   NONE
+usage         1:            cpu=51:39:15, mem=50305.96562 GB s, io=8.96337 GB, vmem=4.240G, maxvmem=9.060G
+binding       1:            NONE
+scheduling info:            (Collecting of scheduler job information is turned off)

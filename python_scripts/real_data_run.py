@@ -3,22 +3,24 @@
 
 # This file contains python code to check the hypothesis testing
 
-# In[17]:
+# In[1]:
 
 
 RUN_PYTHON_SCRIPT = True
-SAVED_FOLDER = "real_data_test"
-DATA = ["AD88_PSD100_all.pkl", "Ctrl70_PSD100_all.pkl"]
+#OUTLIER_IDXS = dict(AD=[], ctrl=[])
+OUTLIER_IDXS = dict(AD=[49], ctrl=[14, 19, 30, 38])
+SAVED_FOLDER = "real_data_89_withN_nooutliers"
+DATA = ["AD88_PSD89_all.pkl", "Ctrl92_PSD89_all.pkl"]
 
 
-# In[1]:
+# In[2]:
 
 
 import sys
 sys.path.append("../mypkg")
 
 
-# In[2]:
+# In[3]:
 
 
 import numpy as np
@@ -28,6 +30,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
 from numbers import Number
+import itertools
 
 from easydict import EasyDict as edict
 from tqdm import trange, tqdm
@@ -37,7 +40,7 @@ from IPython.display import display
 from joblib import Parallel, delayed
 
 
-# In[3]:
+# In[4]:
 
 
 import importlib
@@ -45,7 +48,7 @@ import optimization.opt
 importlib.reload(optimization.opt)
 
 
-# In[4]:
+# In[5]:
 
 
 from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
@@ -70,35 +73,52 @@ from models.linear_model import LinearModel
 from joblib import Parallel, delayed
 
 
-# In[5]:
+# In[6]:
 
 
 plt.style.use(FIG_ROOT/"base.mplstyle")
 
 
-# In[6]:
+# In[7]:
 
 
 torch.set_default_tensor_type(torch.DoubleTensor)
 
 
-# 
+# In[ ]:
+
+
+
+
 
 # # Load  data and prepare
 
-# In[12]:
+# In[8]:
 
 
 data_root = DATA_ROOT/"AD_vs_Ctrl_PSD/";
 AD_PSD = load_pkl(data_root/DATA[0]);
 ctrl_PSD = load_pkl(data_root/DATA[1]);
+if not isinstance(AD_PSD, dict):
+    tmp1 = AD_PSD
+    tmp2 = ctrl_PSD
+    AD_PSD = edict()
+    AD_PSD.PSDs = tmp1
+    AD_PSD.freqs = np.arange(1, 41)
+    ctrl_PSD = edict()
+    ctrl_PSD.PSDs = tmp2
+    ctrl_PSD.freqs = np.arange(1, 41)
 baseline = pd.read_csv(data_root/"AllDataBaselineOrdered_r_ncpt.csv");
 baseline["Gender_binary"] = baseline["Gender"].apply(lambda x: 0 if x=="female" else 1);
 baseline["Grp_binary"] = baseline["Grp"].apply(lambda x: 1 if x=="AD" else 0);
 
 
-# In[14]:
+# In[9]:
 
+
+# The outlier idxs to rm
+outlier_idxs = np.concatenate([OUTLIER_IDXS["AD"], len(AD_PSD.PSDs)+np.array(OUTLIER_IDXS["ctrl"])])
+outlier_idxs = outlier_idxs.astype(int)
 
 # make PSD in dB and std 
 raw_X = np.concatenate([AD_PSD.PSDs, ctrl_PSD.PSDs]); #n x d x npts
@@ -110,11 +130,21 @@ Y = np.array(baseline["MMSE"])[:X.shape[0]];
 sel_cov = ["Gender_binary", "MEG_Age"]
 Z_raw = np.array(baseline[sel_cov])[:X.shape[0]];
 
+grp_idxs = np.array(baseline["Grp"])[:X.shape[0]];
+
+# remove outliers
+X = np.delete(X, outlier_idxs, axis=0)
+Y = np.delete(Y, outlier_idxs, axis=0)
+Z_raw = np.delete(Z_raw, outlier_idxs, axis=0)
+grp_idxs = np.delete(grp_idxs, outlier_idxs, axis=0)
+
+
 #remove nan
 keep_idx = ~np.bitwise_or(np.isnan(Y), np.isnan(Z_raw.sum(axis=1)));
 X = X[keep_idx];
 Y = Y[keep_idx]
 Z_raw = Z_raw[keep_idx]
+grp_idxs = grp_idxs[keep_idx]
 
 Z_raw_mean = Z_raw.mean(axis=0, keepdims=1);
 Z_raw_std = Z_raw.std(axis=0, keepdims=1);
@@ -134,7 +164,7 @@ all_data.Y = torch.tensor(Y)
 all_data.Z = torch.tensor(Z)
 
 
-# In[15]:
+# In[10]:
 
 
 # atlas
@@ -151,7 +181,7 @@ rois = np.loadtxt(DATA_ROOT/"dk68_utils/ROI_order_DK68.txt", dtype=str);
 
 # ## Params
 
-# In[10]:
+# In[11]:
 
 
 np.random.seed(0)
@@ -159,7 +189,7 @@ paras = edict(def_paras.copy())
 
 # Others
 paras.num_rep = 1000 
-paras.freqs = AD_PSD.get("freqs");
+paras.freqs = AD_PSD.get("freqs", np.arange(1, 41)).reshape(-1);
 paras.SIS_ratio = 1 # the ratio to keep with SIS procedure
 paras.svdinv_eps_Q = 1
 paras.svdinv_eps_Psi = 0.999
@@ -178,11 +208,11 @@ paras.d = X.shape[1]# num of ROIs
 paras.q = Z.shape[1] # num of other covariates
 
 # b-spline
-paras.N = 8 # int(3*paras.n**(1/paras.ord/2)) # num of basis for bsp
 paras.x = np.linspace(0, 1, paras.npts)
-paras.basis_mat = torch.tensor(obt_bsp_basis_Rfn_wrapper(paras.x, paras.N, paras.ord)).to(torch.get_default_dtype())
-assert paras.N == paras.basis_mat.shape[1]
-print(f"The number of B-spline basis is {paras.N:.0f}.")
+#paras.N = 8 # int(3*paras.n**(1/paras.ord/2)) # num of basis for bsp
+#paras.basis_mat = torch.tensor(obt_bsp_basis_Rfn_wrapper(paras.x, paras.N, paras.ord)).to(torch.get_default_dtype())
+#assert paras.N == paras.basis_mat.shape[1]
+#print(f"The number of B-spline basis is {paras.N:.0f}.")
 
 # optimization
 paras.Rmin = 10000 # just make it large, do not let it play the main role (on Jun 12, 2023)
@@ -202,7 +232,7 @@ paras.r, paras.m = paras.Cmat.shape
 paras.t_vec = np.zeros(paras.Cmat.shape[0]) # t vec, typically it is zero vector
 
 
-# In[11]:
+# In[12]:
 
 
 paras.save_dir = RES_ROOT/SAVED_FOLDER
@@ -216,29 +246,28 @@ if not paras.save_dir.exists():
 
 
 
+# In[13]:
+
+
+bands_cut = edict()
+bands_cut.delta = [1, 4]
+bands_cut.theta = [4, 8]
+bands_cut.alpha = [8, 12]
+bands_cut.beta = [12, 35]
+bands_cut.pts = [4, 8, 12, 35]
+
+cut_pts = np.abs(paras.freqs.reshape(-1, 1) - bands_cut.pts).argmin(axis=0)
+
+
+# In[ ]:
+
+
+
+
+
 # ## Fns
 
-# In[12]:
-
-
-def all_combinations(vec1, vec2):
-    """
-    Generate all possible combinations of elements from two input vectors.
-
-    Args:
-    vec1 (array-like): First input vector.
-    vec2 (array-like): Second input vector.
-
-    Returns:
-    numpy.ndarray: A 2D array containing all possible combinations of elements from vec1 and vec2.
-    """
-    grid = np.meshgrid(vec1, vec2)
-    combos = np.dstack(grid)
-    combos = combos.reshape(-1, 2)
-    return combos
-
-
-# In[13]:
+# In[14]:
 
 
 def MS2idxs(q, N, MS_unions):
@@ -251,7 +280,7 @@ def MS2idxs(q, N, MS_unions):
     return idxs_all
 
 
-# In[14]:
+# In[15]:
 
 
 def get_Amat(k, paras):
@@ -269,7 +298,7 @@ def get_Amat(k, paras):
     return A
 
 
-# In[15]:
+# In[16]:
 
 
 def obt_test_stat(model, est_alp, est_Gam, paras):
@@ -341,7 +370,7 @@ def obt_test_stat(model, est_alp, est_Gam, paras):
 
 # # Run
 
-# In[16]:
+# In[24]:
 
 
 def move_elements_to_front(indices, vec=torch.arange(68)):
@@ -358,7 +387,7 @@ def move_elements_to_front(indices, vec=torch.arange(68)):
     result = torch.cat((selected_elements.sort().values, remaining_elements.sort().values))
     
     return result
-def _run_fn(seed, lam, roi_idxs=[0]):
+def _run_fn(seed, lam, N, roi_idxs=[0], paras=None):
     torch.set_default_tensor_type(torch.DoubleTensor)
     cur_data = edict()
     cur_data.X = all_data.X.clone()
@@ -373,7 +402,7 @@ def _run_fn(seed, lam, roi_idxs=[0]):
     torch.manual_seed(seed)
         
     _paras = edict(paras.copy())
-    fil_name = _paras.save_dir/f"seed-{seed:.0f}_lam-{lam*1000:.0f}_roi-{'-'.join(map(str, roi_idxs))}.pkl";
+    fil_name = _paras.save_dir/f"seed-{seed:.0f}_lam-{lam*1000:.0f}_N-{N:.0f}_roi-{'-'.join(map(str, roi_idxs))}.pkl";
     if fil_name.exists():
         return load_pkl(fil_name)
     
@@ -381,6 +410,9 @@ def _run_fn(seed, lam, roi_idxs=[0]):
     _paras.seed = seed
     _paras.Rv = _paras.Rfct * _paras.Rmin
     _paras.roi_idxs = roi_idxs
+    _paras.N = N 
+    _paras.basis_mat = torch.tensor(obt_bsp_basis_Rfn_wrapper(_paras.x, _paras.N, _paras.ord)).to(torch.get_default_dtype())
+    assert _paras.N == _paras.basis_mat.shape[1]
     est_Gam_full = torch.zeros(_paras.N, _paras.d).to(torch.get_default_dtype());
 
     
@@ -443,11 +475,11 @@ def _run_fn(seed, lam, roi_idxs=[0]):
     return main_res, cv_errs, T_v, _paras
 
 
-# In[17]:
+# In[25]:
 
 
 paras.stop_cv = 5e-5
-paras.max_iter = 10000
+paras.max_iter = 20000
 paras.sel_idx = np.arange(1, paras.d) # M^c set, 
 paras.Rfct = 10
 
@@ -457,17 +489,19 @@ paras.Cmat = np.eye(len(paras.M_idxs)) # Cmat \times beta_M(s), r x m
 paras.r, paras.m = paras.Cmat.shape
 paras.t_vec = np.zeros(paras.Cmat.shape[0]) # t vec, typically it is zero vector
 
-paras.lams = [5, 6]
-paras.lams = [1, 2,  2.5, 3, 4]
-paras.lams = [0.1, 0.5, 12, 24]
+paras.lams = [0.1, 0.5, 1, 2, 3, 4, 5, 6, 12, 24]
+paras.Ns = [6, 8, 10, 12, 14]
+
+roi_idxs_all = np.arange(68);
+all_coms = itertools.product(paras.lams, paras.Ns, roi_idxs_all);
 
 
 # In[ ]:
 
 
-roi_idxs_all = np.arange(68);
 seed = 0
-all_coms = all_combinations(paras.lams, roi_idxs_all);
-with Parallel(n_jobs=20) as parallel:
-    ress = parallel(delayed(_run_fn)(seed, lam, [int(roi_idx)]) for lam, roi_idx in tqdm(all_coms))
+with Parallel(n_jobs=28) as parallel:
+    ress = parallel(delayed(_run_fn)(seed, lam, N, [int(roi_idx)], paras) for lam, N, roi_idx 
+                    in tqdm(all_coms, total=len(paras.Ns)*len(paras.lams)*68))
+
 
