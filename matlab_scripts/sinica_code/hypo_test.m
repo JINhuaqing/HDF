@@ -19,15 +19,16 @@ save_folder = '../results/sinica_results/';
 data_folder = '../data/matlab_data/';
 data_prefix = 'psd40no_';
 pn = 68;
-n = 152; % number of subjects
 
 
 % load the CV results for the first two steps
 lam_results = load([save_folder data_prefix 'cv_err_eta.mat']);
 tau_results = load([save_folder data_prefix 'cv_err_w.mat']);
 
+n = length(lam_results.est_diffs{1}); % number of observations
+
 % opt for lam, first step
-est_diff_mat = reshape(cell2mat(lam_results.est_diffs(:))', [152, numel(lam_results.lambdas)*numel(lam_results.sns)]);
+est_diff_mat = reshape(cell2mat(lam_results.est_diffs(:))', [n, numel(lam_results.lambdas)*numel(lam_results.sns)]);
 norm_v = mean(est_diff_mat.^2);
 [~, ix_opt] = min(norm_v);
 [opt_sn_i, opt_lam_i] = ind2sub([numel(lam_results.sns), numel(lam_results.lambdas)], ix_opt);

@@ -15,10 +15,8 @@ addpath sinica_code/my_own/
 % parameters to use 
 save_folder = '../results/sinica_results/';
 data_folder = '../data/matlab_data/';
-data_prefix = 'psd40no_';
+data_prefix = 'psd40_';
 ncv = 5; % num of CV folds
-n = 152; % num of subjects
-pn = 68; % num of ROIs, fns. 
 
 sns = [6 8 10 12 14];
 lambdas = [0.01, 0.03, 0.09, 0.27, 0.81, 2.73];
@@ -27,7 +25,7 @@ lambdas = [0.01, 0.03, 0.09, 0.27, 0.81, 2.73];
 all_coms = numel(sns) * numel(lambdas);
 
 % parallel runing
-parpool(10);
+parpool(20);
 
 
 

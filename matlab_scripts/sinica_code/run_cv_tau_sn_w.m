@@ -15,12 +15,13 @@ addpath sinica_code/wild_bootstrap/
 
 data_folder = '../data/matlab_data/';
 save_folder = '../results/sinica_results/';
-data_prefix = 'psd40no_';
+data_prefix = 'psd40_';
 
 % get the opt sn from first step
 lam_results = load([save_folder data_prefix 'cv_err_eta.mat']);
+n = length(lam_results.est_diffs{1}); % number of observations
 % opt for lam, first step
-est_diff_mat = reshape(cell2mat(lam_results.est_diffs(:))', [152, numel(lam_results.lambdas)*numel(lam_results.sns)]);
+est_diff_mat = reshape(cell2mat(lam_results.est_diffs(:))', [n, numel(lam_results.lambdas)*numel(lam_results.sns)]);
 norm_v = mean(est_diff_mat.^2);
 [~, ix_opt] = min(norm_v);
 [opt_sn_i, opt_lam_i] = ind2sub([numel(lam_results.sns), numel(lam_results.lambdas)], ix_opt);
@@ -29,7 +30,6 @@ opt_sn = lam_results.sns(opt_sn_i);
 opt_sn
 
 
-n = 152; % number of observations
 pn = 68; % number of predictors
 ncv = 5; % number of folds for CV
 taus= [0.09, 0.27, 0.81, 2.73, 8.1, 24]; % tau sequence, in fact it is tau in paper (3.9)
@@ -39,7 +39,7 @@ cv_idxs =crossvalind('Kfold', n, ncv); % generate the CV index
 tau_v_opt = zeros(pn, 1);
 
 % parallel runing
-parpool(10);
+parpool(20);
 
 parfor cur_fn_ix = 1:pn
     Hn = [cur_fn_ix];
