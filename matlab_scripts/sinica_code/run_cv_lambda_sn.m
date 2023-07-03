@@ -1,4 +1,5 @@
-% To estimate eta and use CV to select sn and lambda
+% Step 1
+% To estimate eta and use CV to select sn and lambda, to estimate eta
 % sn = [6, 8, 10, 12, 14]
 % lambdas = []
 
@@ -9,6 +10,7 @@ clear all;
 cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
 addpath sinica_code/
 addpath sinica_code/algorithms/
+addpath sinica_code/my_own/
 
 % parameters to use 
 ncv = 5; % num of CV folds
@@ -44,8 +46,8 @@ parfor ix= 1:all_coms
      est_diffs{ix} = y - y_est;
   
 end
- saved_name = ['../results/sinica_results/psd40/cv_err_eta.mat' ];
- save(saved_name, "est_diffs", "sns", "lambdas");
+saved_name = ['../results/sinica_results/psd40/cv_err_eta.mat' ];
+save(saved_name, "est_diffs", "sns", "lambdas");
    % delete the pool
 delete(gcp('nocreate'));
 

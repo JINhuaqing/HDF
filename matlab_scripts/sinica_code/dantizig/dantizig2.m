@@ -1,4 +1,4 @@
-function [M,lamdaopt]=dantizig2(Hn,theta,n,sn,lamdaseq,GK1)
+function [lamdaopt, min_v, CV1]=dantizig2(Hn,theta,n,sn,lamdaseq,GK1)
 %This is the dantizig procedure for column wisely optimzing
 % w_l isn (pn-hn)sn by 1;  E_l is n by 1 vector, l=1,..,hn*sn
 
@@ -29,6 +29,7 @@ function [M,lamdaopt]=dantizig2(Hn,theta,n,sn,lamdaseq,GK1)
 %% output variables
 %output 1: M is the hn*sn by (pn-hn)sn matrix=(\hat{w})'=transpose of \hat{w},  in the paper
 %output 2: lamdaopt is the optimal lamda chosen from lamdaseq
+%output 3: min_v is the minimum value of the CV loss function
 %%
 folds1=max(unique(GK1));% this is the number of folds for cv
 m1=size(lamdaseq,2); %m1 is the column dim of lamdaseq which is the number of lamdas
@@ -83,7 +84,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   end of cross validation
 [min_v, min_loc]= min(mean(CV1));
 lamdaopt=lamdaseq(min_loc); %optimal lamda'
-M=dantizig1(Hn,theta,n,sn,lamdaopt);
+%M=dantizig1(Hn,theta,n,sn,lamdaopt);
 
     
         
