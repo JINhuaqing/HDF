@@ -13,6 +13,9 @@ addpath sinica_code/algorithms/
 addpath sinica_code/my_own/
 
 % parameters to use 
+save_folder = '../results/sinica_results/';
+data_folder = '../data/matlab_data/';
+data_prefix = 'psd40no_';
 ncv = 5; % num of CV folds
 n = 152; % num of subjects
 pn = 68; % num of ROIs, fns. 
@@ -36,7 +39,7 @@ parfor ix= 1:all_coms
     lambda = lambdas(lam_i);
     [sn,lambda]
 
-    fil_name = ['../data/matlab_data/psd40_' num2str(sn) '.mat'];
+    fil_name = [data_folder data_prefix num2str(sn) '.mat'];
     cur_data = load(fil_name);
     y = cur_data.Y_centered';
     thetas = cur_data.thetas;
@@ -46,7 +49,7 @@ parfor ix= 1:all_coms
      est_diffs{ix} = y - y_est;
   
 end
-saved_name = ['../results/sinica_results/psd40/cv_err_eta.mat' ];
+saved_name = [save_folder, data_prefix 'cv_err_eta.mat'];
 save(saved_name, "est_diffs", "sns", "lambdas");
    % delete the pool
 delete(gcp('nocreate'));

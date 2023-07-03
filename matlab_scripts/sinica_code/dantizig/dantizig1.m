@@ -1,4 +1,4 @@
-function dantizig1=dantizig1(Hn,theta,n,sn,lamda)
+function dantizig1=dantizig1(Hn,theta,lamda)
 %This is the dantizig procedure for column wisely optimzing
 % w_l isn (pn-hn)sn by 1;  E_l is n by 1 vector, l=1,..,hn*sn
 
@@ -12,6 +12,7 @@ function dantizig1=dantizig1(Hn,theta,n,sn,lamda)
 pn=size(theta,2);
 Hnc=sort(setdiff(1:pn,Hn));
 [m1,pn]=size(theta);
+[n, sn] = size(theta{1});
 Theta=cell2mat(theta);%
 [m2,hn]=size(Hn); % hn 
 G=sort(repmat(1:pn,1,sn));

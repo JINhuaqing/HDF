@@ -1,4 +1,4 @@
-function [lamdaopt, min_v, CV1]=dantizig2(Hn,theta,n,sn,lamdaseq,GK1)
+function [lamdaopt, min_v, CV1]=dantizig2(Hn,theta,lamdaseq,GK1)
 %This is the dantizig procedure for column wisely optimzing
 % w_l isn (pn-hn)sn by 1;  E_l is n by 1 vector, l=1,..,hn*sn
 
@@ -34,6 +34,7 @@ function [lamdaopt, min_v, CV1]=dantizig2(Hn,theta,n,sn,lamdaseq,GK1)
 folds1=max(unique(GK1));% this is the number of folds for cv
 m1=size(lamdaseq,2); %m1 is the column dim of lamdaseq which is the number of lamdas
 pn=size(theta,2);
+[n, sn] = size(theta{1});
 hn=size(Hn,2); % hn 
 Hnc=sort(setdiff(1:pn,Hn));
 G=sort(repmat(1:pn,1,sn));

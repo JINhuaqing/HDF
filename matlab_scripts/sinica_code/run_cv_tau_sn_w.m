@@ -11,13 +11,14 @@ cd /home/hujin/jin/MyResearch/HDF_infer/matlab_scripts
 clear all; 
 addpath sinica_code/algorithms/
 addpath sinica_code/dantizig/
-addpath sinica_code/'wild bootstrap'/
+addpath sinica_code/wild_bootstrap/
 
 data_folder = '../data/matlab_data/';
-save_folder = '../results/sinica_results/psd40/';
+save_folder = '../results/sinica_results/';
+data_prefix = 'psd40no_';
 
 % get the opt sn from first step
-lam_results = load([save_folder 'cv_err_eta.mat']);
+lam_results = load([save_folder data_prefix 'cv_err_eta.mat']);
 % opt for lam, first step
 est_diff_mat = reshape(cell2mat(lam_results.est_diffs(:))', [152, numel(lam_results.lambdas)*numel(lam_results.sns)]);
 norm_v = mean(est_diff_mat.^2);
@@ -44,7 +45,7 @@ parfor cur_fn_ix = 1:pn
     Hn = [cur_fn_ix];
     [Hn]
     
-    fil_name = [data_folder 'psd40_' num2str(opt_sn) '.mat'];
+    fil_name = [data_folder data_prefix num2str(opt_sn) '.mat'];
     cur_data = load(fil_name);
     y = cur_data.Y_centered';
     thetas = cur_data.thetas;
@@ -54,12 +55,12 @@ parfor cur_fn_ix = 1:pn
         theta1{1, i} = squeeze(thetas(i, :, :));
     end
      
-    [tauopt, ~, ~] = dantizig2(Hn, theta1, n, opt_sn, taus, cv_idxs);
+    [tauopt, ~, ~] = dantizig2(Hn, theta1, taus, cv_idxs);
     tau_v_opt(cur_fn_ix) = tauopt;
       
 end
 
-saved_name = [save_folder 'cv_err_eta_w.mat'];
+saved_name = [save_folder data_prefix 'cv_err_w.mat'];
 save(saved_name, "taus", "tau_v_opt");
 delete(gcp('nocreate'));
 

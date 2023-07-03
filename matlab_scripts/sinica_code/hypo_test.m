@@ -4,24 +4,27 @@
 
 clear all; 
 % always use this working directory 
-cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+%cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
 
 addpath 'sinica_code/wild bootstrap/'
 addpath sinica_code/my_own/
 addpath sinica_code/dantizig/
+addpath sinica_code/algorithms/
 
 
 
 % the set of candidate parameters
-sns = [6 8 10 12 14];
-lambdas = [0.01, 0.03, 0.09, 0.27, 0.81, 2.73];
-taus = [0.09, 0.27, 0.81, 2.73, 8.1, 24];
+save_folder = '../results/sinica_results/';
+data_folder = '../data/matlab_data/';
+data_prefix = 'psd40no_';
+pn = 68;
+n = 152; % number of subjects
 
 
 % load the CV results for the first two steps
-save_folder = '../results/sinica_results/psd40/';
-lam_results = load([save_folder 'cv_err_eta.mat']);
-tau_results = load([save_folder 'cv_err_eta_w.mat']);
+lam_results = load([save_folder data_prefix 'cv_err_eta.mat']);
+tau_results = load([save_folder data_prefix 'cv_err_w.mat']);
 
 % opt for lam, first step
 est_diff_mat = reshape(cell2mat(lam_results.est_diffs(:))', [152, numel(lam_results.lambdas)*numel(lam_results.sns)]);
@@ -30,3 +33,35 @@ norm_v = mean(est_diff_mat.^2);
 [opt_sn_i, opt_lam_i] = ind2sub([numel(lam_results.sns), numel(lam_results.lambdas)], ix_opt);
 opt_sn = lam_results.sns(opt_sn_i);
 opt_lam = lam_results.lambdas(opt_lam_i);
+
+% opt for tau, second step
+opt_tau = tau_results.tau_v_opt;
+
+
+% get the data and run
+fil_name = [data_folder 'psd40_' num2str(opt_sn) '.mat'];
+cur_data = load(fil_name);
+y = cur_data.Y_centered';
+thetas = cur_data.thetas;
+    
+theta1 = cell(1, pn);
+for i = 1:pn
+    theta1{1, i} = squeeze(thetas(i, :, :));
+end
+
+% get the results for the third step
+alpha = 0.05; % significance level
+N = 10000; % number of bootstrap samples for hypothesis testing
+[eta_est, f_est] = eta_est_wrapper(thetas, y, opt_lam);
+
+pvals = zeros(pn, 1);
+for fn_idx = 1:pn
+    Hn = [fn_idx]; % set of hypothesis test
+    Hn
+    M = dantizig1(Hn, theta1, opt_tau);
+    S = get_S(Hn, eta_est, M, theta1, y);
+    [pval, ~, ~]= mywild(alpha, N, S);
+    pvals(fn_idx) = pval;
+end
+
+save([save_folder, data_prefix 'pvals.mat'], 'pvals', 'alpha', 'N', 'S', 'eta_est', 'opt_tau', 'opt_lam', 'opt_sn')
