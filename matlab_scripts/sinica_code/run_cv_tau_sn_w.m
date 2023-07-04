@@ -13,9 +13,9 @@ addpath sinica_code/algorithms/
 addpath sinica_code/dantizig/
 addpath sinica_code/wild_bootstrap/
 
-data_folder = '../data/matlab_data/';
+data_folder = '../mid_results/matlab_real_data/';
 save_folder = '../results/sinica_results/';
-data_prefix = 'psd40_';
+data_prefix = 'psd89_';
 
 % get the opt sn from first step
 lam_results = load([save_folder data_prefix 'cv_err_eta.mat']);

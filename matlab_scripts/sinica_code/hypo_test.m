@@ -4,20 +4,20 @@
 
 clear all; 
 % always use this working directory 
-%cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
-cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
+cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+%cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
 
-addpath 'sinica_code/wild bootstrap/'
 addpath sinica_code/my_own/
 addpath sinica_code/dantizig/
 addpath sinica_code/algorithms/
+addpath sinica_code/wild_bootstrap/
 
 
 
 % the set of candidate parameters
 save_folder = '../results/sinica_results/';
-data_folder = '../data/matlab_data/';
-data_prefix = 'psd40no_';
+data_folder = '../mid_results/matlab_real_data/';
+data_prefix = 'psd89_';
 pn = 68;
 
 
@@ -40,7 +40,7 @@ opt_tau = tau_results.tau_v_opt;
 
 
 % get the data and run
-fil_name = [data_folder 'psd40_' num2str(opt_sn) '.mat'];
+fil_name = [data_folder data_prefix num2str(opt_sn) '.mat'];
 cur_data = load(fil_name);
 y = cur_data.Y_centered';
 thetas = cur_data.thetas;

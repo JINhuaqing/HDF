@@ -72,7 +72,7 @@ Theta22=cell2mat(Theta2);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
     for r=1:m1  %this is for the lamda sequence lamdaseq(r)
-        sol=dantizig1(Hn,thetacv,ncv,sn,lamdaseq(r)); %this is the estimator from training sample,sol is hn*sn by (pn-hn)*sn matrix
+        sol=dantizig1(Hn,thetacv,lamdaseq(r)); %this is the estimator from training sample,sol is hn*sn by (pn-hn)*sn matrix
         CV2=zeros(1,hn*sn);%%%for the loss for l=1,..,hnsn
         for rr=1:hn*sn
         CV2(rr)=(norm(ncv1^(-1)*(Theta22)'*(Theta22*sol(rr,:)'-Theta11(:,rr)),2))^2; %L2 norm loss
@@ -85,7 +85,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   end of cross validation
 [min_v, min_loc]= min(mean(CV1));
 lamdaopt=lamdaseq(min_loc); %optimal lamda'
-%M=dantizig1(Hn,theta,n,sn,lamdaopt);
+%M=dantizig1(Hn,theta,lamdaopt);
 
     
         

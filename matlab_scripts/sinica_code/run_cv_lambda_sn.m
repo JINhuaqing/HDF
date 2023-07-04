@@ -14,8 +14,8 @@ addpath sinica_code/my_own/
 
 % parameters to use 
 save_folder = '../results/sinica_results/';
-data_folder = '../data/matlab_data/';
-data_prefix = 'psd40_';
+data_folder = '../mid_results/matlab_real_data/';
+data_prefix = 'psd89_';
 ncv = 5; % num of CV folds
 
 sns = [6 8 10 12 14];

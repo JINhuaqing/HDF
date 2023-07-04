@@ -125,7 +125,7 @@ class SGM:
         self.D = D
         self.k = k
         
-    def __call__(self, raw_params):
+    def __call__(self, raw_params, is_std=True):
         """run_forward. Function for running the forward model over the passed in range of frequencies,
         for the handed set of parameters (which must be passed in as a dictionary)
     
@@ -134,6 +134,7 @@ class SGM:
             D = brain.distance_matrix
             params (dict): Dictionary of a setting of parameters for the NTF model.
             freqs (array): Array of freqencies for which the model is to be calculated, in Hz
+            is_std: std the psd across freq axis or not, default is True
     
         Returns:
             model_out(array): PSD in dB, and standardized
@@ -152,7 +153,8 @@ class SGM:
         model_out = np.array(model_out).T
         
         model_out_dB = 20* np.log10(model_out)
-        model_out_dB = (model_out_dB-model_out_dB.mean(axis=-1, keepdims=True))/model_out_dB.std(axis=-1, keepdims=True)
+        if is_std:
+            model_out_dB = (model_out_dB-model_out_dB.mean(axis=-1, keepdims=True))/model_out_dB.std(axis=-1, keepdims=True)
         
         return model_out_dB
         
