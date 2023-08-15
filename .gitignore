@@ -7,3 +7,4 @@ tmp
 mid_results/
 **/logs/
 figs/*
+tmp.*
