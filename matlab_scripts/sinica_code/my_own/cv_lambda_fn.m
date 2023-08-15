@@ -9,7 +9,7 @@ function y_est = cv_lambda_fn(thetas, y, ncv, lambda)
 %   y_est: estimated Y: n x 1
 
     n = size(thetas, 2);
-    cv_idxs = crossvalind('Kfold', n, ncv);
+    cv_idxs = gen_cv_idxs(n, ncv);
     y_est = zeros(n, 1);
     for cvi = 1:ncv
         y_train = y(cv_idxs~=cvi);

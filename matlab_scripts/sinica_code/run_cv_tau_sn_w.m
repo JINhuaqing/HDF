@@ -34,7 +34,7 @@ pn = 68; % number of predictors
 ncv = 5; % number of folds for CV
 taus= [0.09, 0.27, 0.81, 2.73, 8.1, 24]; % tau sequence, in fact it is tau in paper (3.9)
 %Hn = [1]; % The set of fns chosen for hypothesis testing
-cv_idxs =crossvalind('Kfold', n, ncv); % generate the CV index
+cv_idxs = gen_cv_idxs(n, ncv); % generate the CV index
 
 tau_v_opt = zeros(pn, 1);
 

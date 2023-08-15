@@ -24,7 +24,7 @@ function [lamdaopt, min_v, CV1]=dantizig2(Hn,theta,lamdaseq,GK1)
 %         during the dantizig procedure. (\tau_n in the paper). For e.g.,
 %         lamdaseq=[0.01:0.01:0.1]
 %input 6: GK1 is the setting of cross-validation for tuning \tau_n or
-%         lamda, for e.g, we can set GK1=crossvalind('Kfold', n, 5); where
+%         lamda, for e.g, we can set GK1=gen_cv_idxs(n, 5); where
 %         5 means the five-folds-cv
 %% output variables
 %output 1: M is the hn*sn by (pn-hn)sn matrix=(\hat{w})'=transpose of \hat{w},  in the paper
