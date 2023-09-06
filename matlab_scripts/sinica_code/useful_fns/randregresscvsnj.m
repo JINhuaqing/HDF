@@ -17,7 +17,8 @@ function [A, B] = randregresscvsnj(y,folds,M,Mr)
 % output2:B =is an sum(A) by 1 vector of  estimated regression coefficients
 %         based on whole data
 n=length(y);                                           %this is sample size
-cv=crossvalind('Kfold', n, folds);
+%cv=crossvalind('Kfold', n, folds);
+cv=gen_cv_idxs(n, folds);
 pn=size(M,2);                                          %this is the # of predicors
 folds=length(unique(cv));                              % # of folds for cv
 

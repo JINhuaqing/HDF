@@ -45,8 +45,10 @@ grids=mgrids(a,b,m);
 %% 2.Next, we process the X and Y
 y = cur_data.Y_centered';
 
-cv_idxs =crossvalind('Kfold', n, folds); % 'folds=5' folds for sample size n data, correspond to a single monte carlo for lamdan , sn
-cv_idxs_d =crossvalind('Kfold', n, folds_d); % 'folds=5' folds for sample size n data, correspond to a single monte carlo for lamda' of dantizig
+%cv_idxs =crossvalind('Kfold', n, folds); % 'folds=5' folds for sample size n data, correspond to a single monte carlo for lamdan , sn
+%cv_idxs_d =crossvalind('Kfold', n, folds_d); % 'folds=5' folds for sample size n data, correspond to a single monte carlo for lamda' of dantizig
+cv_idxs =gen_cv_idxs(n, folds); % 'folds=5' folds for sample size n data, correspond to a single monte carlo for lamdan , sn
+cv_idxs_d =gen_cv_idxs(n, folds_d); % 'folds=5' folds for sample size n data, correspond to a single monte carlo for lamda' of dantizig
 
 % Next we generate the f, coeffs and orthcoeffes for each realizations xij(.) on m=100 equally spaced points on [a,b]
 % i..e., get the basis (on Aug 18, 2023), in fact, M1 and M2 are no use

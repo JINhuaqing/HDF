@@ -27,7 +27,7 @@ def gen_simu_psd(n, d, freqs, prior_sd=10, n_jobs=1, is_prog=False, is_std=True)
         prior_sd (float, optional): The prior standard deviation of the SGM parameters. Default is 10.
         n_jobs (int, optional): Number of jobs to generate the data. Default is 1.
         is_prog (bool, optional): Whether to show progress bar or not. Default is False.
-        is_std (bool, optional): Whether to std the psd across freq axis or not. Default is False.
+        is_std (bool, optional): Whether to std the psd across freq axis or not. Default is True.
 
     Returns:
         psds (numpy.ndarray): An n x d x len(freqs) array of simulated PSD data.
