@@ -2,8 +2,8 @@
 % use it as a template to get other script.
 clear all;
 % always use this working directory
-cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
-%cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
+%cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
 
 addpath sinica_code/my_own/
 addpath sinica_code/dantizig/
@@ -42,13 +42,13 @@ c1 = 0;
 num_rep = 200;
 
 % parallel runing
-parpool(35);
-parfor rep_ix = 1:num_rep
+parpool(3);
+parfor rep_ix = 1:50
 %for rep_ix = 1:num_rep
     %% 1.4 data
     %rep_ix = 1;
     %cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
-    fil_name = ['c1_' num2str(c1*10) '_seed_' num2str(rep_ix-1)];
+    fil_name = ['c1_' num2str(c1*10) '_seed_' num2str(rep_ix+100-1)]
     cur_data = load([root_data_folder data_folder fil_name '.mat']);
     [n, pn, ~] = size(cur_data.X_centered);
     
@@ -96,7 +96,6 @@ parfor rep_ix = 1:num_rep
     % end of generate the estimated variance row vectors for the \theta_{ijk}
     
     
-    
     %% 3 Simulation
     %% 3.1 Get optimal sn and lam for eta
     CV1=zeros(length(sns),n_lam);
@@ -104,7 +103,7 @@ parfor rep_ix = 1:num_rep
     opt_sn =0;  %optimal number of bspline basis functions sn
     
     for sn_idx=1:length(sns)  %row of CV1
-        sn = sns(sn_idx)
+        sn = sns(sn_idx);
         G=sort(repmat(1:pn,1,sn));
         Theta1=cell(1,pn);
         for j=1:pn
@@ -240,9 +239,15 @@ parfor rep_ix = 1:num_rep
     if ~exist(save_folder', 'dir')
         mkdir(save_folder)
     end
-    save([save_folder ...
-         fil_name '_res.mat'],  ...
-        'pval', 'TT', 'CV', 'opt_eta_est', 'opt_lam', 'opt_sn');
+    
+    result = struct;
+    result.pval = pval;
+    result.TT = TT;
+    result.CV = CV;
+    result.opt_eta_est = opt_eta_est;
+    result.opt_lam = opt_lam;
+    result.opt_sn = opt_sn;
+    parsave([save_folder fil_name '_res.mat'],  result);
     
 end
 delete(gcp('nocreate'));
