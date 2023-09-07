@@ -1,10 +1,9 @@
-% Run my real data on the code the authors provided
+% Run simulation on the code the authors provided
 % use it as a template to get other script.
-% Let me currently suspend the real data to wait my simulation results
 clear all;
 % always use this working directory
-%cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
-cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
+cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+%cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
 
 addpath sinica_code/my_own/
 addpath sinica_code/dantizig/
@@ -43,9 +42,9 @@ c1 = 0;
 num_rep = 200;
 
 % parallel runing
-%parpool(25);
-%parfor rep_ix = 1:num_rep
-for rep_ix = 1:num_rep
+parpool(35);
+parfor rep_ix = 1:num_rep
+%for rep_ix = 1:num_rep
     %% 1.4 data
     %rep_ix = 1;
     %cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
@@ -246,4 +245,4 @@ for rep_ix = 1:num_rep
         'pval', 'TT', 'CV', 'opt_eta_est', 'opt_lam', 'opt_sn');
     
 end
-%delete(gcp('nocreate'));
+delete(gcp('nocreate'));
