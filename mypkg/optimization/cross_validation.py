@@ -31,7 +31,10 @@ def CV_err_linear_fn(data, num_cv_fold, penalty, inits, is_prg=False, save_paras
         'NR_eps': 1e-05,
         'NR_maxit': 100,
         'stop_cv': 0.0005,
-        'max_iter': 2000}
+        'max_iter': 2000, 
+        'is_center': False,
+        "linear_theta_update": "cholesky_inv",
+        "linear_mat": None}
     _paras = edict(_paras)
     _paras.update(input_paras)
     
@@ -61,6 +64,17 @@ def CV_err_linear_fn(data, num_cv_fold, penalty, inits, is_prg=False, save_paras
         train_set_X = data.X[train_idx]
         train_set_Y = data.Y[train_idx]
         train_set_Z = data.Z[train_idx]
+        
+        if _paras.is_center:
+            test_set_X = test_set_X - train_set_X.mean(axis=0, keepdims=True)
+            test_set_Y = test_set_Y - train_set_Y.mean(axis=0, keepdims=True)
+            # Now, I do not have time to write code to center Z
+            # It is a bit tedious, you should exclude intercept and categorical var
+            #test_set_Z = test_set_Z - train_set_Z.mean(axis=0, keepdims=True)
+            
+            train_set_X = train_set_X - train_set_X.mean(axis=0, keepdims=True)
+            train_set_Y = train_set_Y - train_set_Y.mean(axis=0, keepdims=True)
+            #train_set_Z = train_set_Z - train_set_Z.mean(axis=0, keepdims=True)
         
         cur_model = LinearModel(Y=train_set_Y, X=train_set_X, Z=train_set_Z, 
                         basis_mat=_paras.basis_mat, 

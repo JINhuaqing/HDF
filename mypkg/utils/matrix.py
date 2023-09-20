@@ -1,6 +1,22 @@
 import numpy as np
 import torch
 
+def cholesky_inv(A):
+    """
+    Use it only when A is large (>1000)
+    This function calculates the inverse of a matrix using the Cholesky decomposition.
+    
+    Parameters:
+    A (torch.Tensor): The input matrix to be inverted, a symmetric PD matrix.
+    
+    Returns:
+    torch.Tensor: The inverted matrix.
+    """
+    U = torch.linalg.cholesky(A)
+    Ainv = torch.cholesky_inverse(U)
+    return Ainv
+
+
 def conju_grad(A, vec, maxIter=1000, eps=1e-9):
         """ 
         A should be PD matrix

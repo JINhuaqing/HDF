@@ -4,6 +4,7 @@ from tqdm import trange
 from easydict import EasyDict as edict
 import torch
 from optimization.one_step_opt import OneStepOpt
+from models.linear_model import LinearModel
 from utils.matrix import  col_vec2mat_fn
 
 
@@ -16,6 +17,14 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
                    inits = [alp_init, Gam_init, theta_init, rhok_init]
             input_paras: other parmaters
                 is_small: Whether remove model or not after optmization. If not, the output can be very large
+                linear_theta_update: 
+                                if conjugate, use conj_grad
+                                if cholesky_solve, use cholesky_solve
+                                if cholesky_inv, get the cholesky inverse
+                linear_mat: The matrix for linear_theta_update:
+                                if conjugate, None
+                                if cholesky_solve, L where the cholesky decom of left_mat=LL^T under linear, 
+                                if cholesky_inv, inverse of left_mat
         
     """
     eps = 1e-10 # a small number to avoid divided-by-zero issue
@@ -27,7 +36,9 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
               'NR_eps': 1e-05,
               'NR_maxit': 100,
               'stop_cv': 0.0005,
-              'max_iter': 2000}
+              'max_iter': 2000, 
+              "linear_theta_update": "cholesky_inv",
+              "linear_mat": None}
     _paras = edict(_paras)
     _paras.update(input_paras)
     _paras.q = model.Z.shape[-1]
@@ -52,7 +63,10 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
                           penalty=penalty, 
                           NR_eps=_paras.NR_eps, 
                           NR_maxit=_paras.NR_maxit, 
-                          R=_paras.Rv)
+                          R=_paras.Rv, 
+                          linear_theta_update=_paras.linear_theta_update,
+                          linear_mat=_paras.linear_mat
+                          )
             opt()
             Gam_init = opt.Gamk
             rhok_init = opt.rhok
@@ -90,6 +104,8 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
             last_Gamk = opt.Gamk
             last_rhok = opt.rhok
             last_thetak = opt.thetak
+            if isinstance(model, LinearModel):
+                _paras.linear_mat = opt.linear_mat
         
     if ix == (_paras.max_iter-1):
         print(f"The optimization may not converge with stop value {stop_v:.3E}")

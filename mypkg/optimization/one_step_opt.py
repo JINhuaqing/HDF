@@ -1,9 +1,10 @@
 import torch
 import numpy as np
 from easydict import EasyDict as edict
-from utils.matrix import col_vec_fn, col_vec2mat_fn, gen_Dmat, svd_inverse, conju_grad
+from utils.matrix import col_vec_fn, col_vec2mat_fn, gen_Dmat, svd_inverse, conju_grad,  cholesky_inv
 from projection import euclidean_proj_l1ball
 from models.linear_model import LinearModel
+import time
 
 def theta_proj(thetal, q, N, R):
     """Proj theta to the space \|theta_1\|_1 + \sum_j \|theta_2j\|_2 < R
@@ -41,8 +42,21 @@ class OneStepOpt():
                     R: The radius of the projection space
                     NR_eps: the stop criteria for Newton-Ralpson method
                     NR_maxit: the max num of iterations for Newton-Ralpson method
+                    linear_theta_update: 
+                                if conjugate, use conj_grad
+                                if cholesky_solve, use cholesky_solve
+                                if cholesky_inv, get the cholesky inverse
+                    linear_mat: The matrix for linear_theta_update:
+                                if conjugate, None
+                                if cholesky_solve, L where the cholesky decom of left_mat=LL^T under linear, 
+                                if cholesky_inv, inverse of left_mat
         """
-        paras = edict(paras)
+        self.paras = edict({
+            "linear_theta_update": "cholesky_inv",
+            "linear_mat": None,
+                           })
+        self.paras.update(paras)
+        
         self.N, self.d = Gamk.shape
         assert len(rhok) == self.N * self.d
         if theta_init is None:
@@ -63,7 +77,11 @@ class OneStepOpt():
         self.D = gen_Dmat(self.d, self.N, self.q)
         self.beta = beta
         self.alpha = alpha
-        self.paras = paras
+        
+        if isinstance(self.model, LinearModel):
+            self.linear_theta_update = self.paras.linear_theta_update.lower()
+            assert self.linear_theta_update in ["conjugate", "cholesky_solve", "cholesky_inv"]
+            self.linear_mat = self.paras.linear_mat
     
     def _update_theta_linearmodel(self):
         """First step of optimization, update theta under linear model.
@@ -72,12 +90,32 @@ class OneStepOpt():
         if self.model.lin_tm_der is None:
             self.model._linear_term_der()
             
-        tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
-        left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
         right_vec = (self.D.T@self.rhok +
                      self.beta*self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N) + 
                      (self.model.Y.unsqueeze(-1)*self.model.lin_tm_der).mean(dim=0)/self.model.sigma2)
-        thetak_raw = conju_grad(left_mat, right_vec)
+        if self.linear_theta_update.startswith("cholesky_inv"):
+            if self.linear_mat is None:
+                tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
+                left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
+                self.linear_mat = cholesky_inv(left_mat)
+            thetak_raw = self.linear_mat @ right_vec;
+                
+        elif self.linear_theta_update.startswith("conjugate"):
+            tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
+            left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
+            
+            thetak_raw = conju_grad(left_mat, right_vec)
+            
+        elif self.linear_theta_update.startswith("cholesky_solve"):
+            if self.linear_mat is None:
+                tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
+                left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
+                self.linear_mat = torch.linalg.cholesky(left_mat)
+            thetak_raw = torch.cholesky_solve(right_vec.reshape(-1, 1), self.linear_mat).reshape(-1);
+        else:
+            raise TypeError(f"No such type, {self.linear_theta_update}")
+            
+        
         self.thetak = theta_proj(thetak_raw, self.q, self.N, self.paras.R) # projection
     
     def _update_theta(self):
@@ -126,11 +164,17 @@ class OneStepOpt():
         self.Gamk = GamNk * np.sqrt(self.N)
     
     def __call__(self):
+        t0 = time.time()
         if isinstance(self.model, LinearModel):
             self._update_theta_linearmodel()
         else:
             self._update_theta()
+        t1 = time.time()
         self._update_rho()
+        t2 = time.time()
         self._update_Gam()
+        t3 = time.time()
         self._update_rho()
+        t4 = time.time()
         self.alpk = self.thetak[:self.q]
+        #print(np.diff([t0, t1, t2, t3, t4]))

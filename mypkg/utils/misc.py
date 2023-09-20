@@ -2,6 +2,42 @@ import numpy as np
 import pickle
 from easydict import EasyDict as edict
 
+def get_local_min_idxs(x):
+    """ This fn is to get the local minimals. 
+        args:
+            x: a vec;
+        return:
+            local minimal idxs in x.
+    """
+    x_diff = np.diff(x)
+    idc_vec = np.diff(np.sign(x_diff))
+    
+    # if v=2, must be a local minimal
+    true_2s = np.where(idc_vec==2)[0]
+    
+    idxs1 = np.where(idc_vec==1)[0]
+    true_1s = []
+    flag = 0
+    while flag < len(idxs1):
+        if flag == len(idxs1)-1:
+            break
+        if np.min(idc_vec[idxs1[flag]:idxs1[flag+1]]) >=0:
+            true_1s.append(idxs1[flag])
+            true_1s.append(idxs1[flag+1])
+            flag += 2
+        else:
+            flag += 1
+    true_1s = np.array(true_1s)
+    
+    true_0s = [[]]
+    for ix in range(0, len(true_1s), 2):
+        true_0s.append(np.arange(true_1s[ix]+1, true_1s[ix+1]))
+        
+    true_0s = np.concatenate(true_0s)
+    
+    all_loc_min_idxs = np.sort(np.concatenate([true_0s, true_1s, true_2s])) + 1
+    return all_loc_min_idxs.astype(int)
+        
 
 def load_pkl_folder2dict(folder, excluding=[], including=["*"], verbose=True):
     """The function is to load pkl file in folder as an edict
