@@ -167,11 +167,11 @@ paras.Gam_GT_ests = [(np.linalg.inv(basis_mat.numpy().T
                      for basis_mat in paras.basis_mats]
 
 # optimization
-Rmins = [(2*(np.linalg.norm(paras.Gam_GT_ests[ix]
-                            /np.sqrt(paras.can_Ns[ix]), axis=0).sum() 
-           + np.abs(paras.alp_GT).sum())) 
-        for ix in range(len(paras.can_Ns))]
-paras.Rmin = np.max(Rmins)
+#Rmins = [(2*(np.linalg.norm(paras.Gam_GT_ests[ix]
+#                            /np.sqrt(paras.can_Ns[ix]), axis=0).sum() 
+#           + np.abs(paras.alp_GT).sum())) 
+#        for ix in range(len(paras.can_Ns))]
+paras.Rmin = 10000
 #without loss of generality, we assume the idxs in M is the first m betas
 paras.sel_idx = np.arange(1, paras.d) # M^c set, 
 paras.num_cv_fold = 5
@@ -336,8 +336,7 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_prg=False, is_cv=False, is_ve
         
         
         alp_init = (torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd)*0
-        Gam_init = (torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) 
-                    + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd)*0
+        Gam_init = (torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd)*0
         theta_init = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)]) *0
         rhok_init = torch.randn(_paras.d_SIS*_paras.N)*0
             
@@ -376,8 +375,7 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_prg=False, is_cv=False, is_ve
         
         # use a diff initial to reduce the overfitting
         alp_init1 = (torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd)*0
-        Gam_init1 = (torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) 
-                    + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd) *0
+        Gam_init1 = (torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd) *0
         theta_init1 = torch.cat([alp_init1, col_vec_fn(Gam_init1)/np.sqrt(_paras.N)])*0
         rhok_init1 = torch.randn(_paras.d_SIS*_paras.N)*0
         cv_errs = CV_err_linear_fn(data=cur_data_SIS, 

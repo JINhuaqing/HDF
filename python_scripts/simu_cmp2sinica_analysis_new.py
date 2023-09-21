@@ -205,7 +205,7 @@ def _test_fn(Cmat, res1,  rtols=[0, 0], is_verbose=False):
 # In[25]:
 
 
-Cmat = np.eye(2) # change it depending on test1, test2, test3
+Cmat = np.eye(1) # change it depending on test1, test2, test3
 cans = [1e-5, 3e-6, 1e-6, 3e-7, 1e-7, 3e-8, 1e-8, 3e-9, 1e-9, 3e-10, 0]
 all_coms = list(itertools.product(cans, cans))
 for c1 in [0, 0.1, 0.2, 0.4]:
