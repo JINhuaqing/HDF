@@ -38,13 +38,6 @@ from scipy.stats import chi2
 # In[3]:
 
 
-# This will reload all imports as soon as the code changes
-get_ipython().run_line_magic('load_ext', 'autoreload')
-get_ipython().run_line_magic('autoreload', '2')
-
-
-# In[4]:
-
 
 from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
 
@@ -135,17 +128,6 @@ _err_fn = lambda x: np.nanmean(x**2)
 # In[ ]:
 
 
-# Check non-convergence ones
-opt_lamNs = []
-for cur_seed in trange(200):
-    for cur_lam in can_lams:
-        f1_fil = list(paras.save_dir.glob(f"seed_{cur_seed:.0f}-lam_{cur_lam*1000:.0f}-N_{10:.0f}-c1_0_est.pkl"))[0]
-        t_res1 = load_pkl(f1_fil, verbose=0)
-        if not t_res1.main_res[-1]:
-            print(cur_seed, cur_lam)
-
-
-# In[ ]:
 
 
 
@@ -159,7 +141,6 @@ for cur_seed in trange(200):
 can_Ns = [4, 6, 8, 10, 12]
 c1s = [0, 0.1, 0.2, 0.4]
 can_lams = [0.01, 0.1, 0.2, 0.3, 0.4, 0.6, 1, 2, 8];
-c1 = 0.1
 
 
 # In[ ]:
@@ -220,15 +201,6 @@ def _test_fn(Cmat, res1,  rtols=[0, 0], is_verbose=False):
     return res3.T_v, res3.pval
 
 
-# In[78]:
-
-
-c1 = 0
-cur_N = 10
-f1_name = f"seed_1-lam_100-N_{cur_N:.0f}-c1_{c1*1000:.0f}_est.pkl"
-res1 = load_pkl(paras.save_dir/f1_name, verbose=False);
-res1._paras.Rv
-
 
 # In[25]:
 
@@ -253,128 +225,6 @@ for c1 in [0, 0.1, 0.2, 0.4]:
         save_pkl(paras.save_dir/f"opt_lamNs_200_c1_{c1*1000:.0f}_ress.pkl", ress)
 
 
-# In[ ]:
-
-
-
-
-
-# ## Find Q and Psi rtol
-
-# In[10]:
-
-
-cans = [1e-5, 3e-6, 1e-6, 3e-7, 1e-7, 3e-8, 1e-8, 3e-9, 1e-9, 3e-10, 0]
-
-
-# In[11]:
-
-
-ress_dict = {}
-for c1 in [0, 0.1, 0.2, 0.4]:
-    ress = load_pkl(paras.save_dir/f"opt_lamNs_200_c1_{c1*1000:.0f}_ress.pkl");
-    ress_dict[c1] = ress
-
-
-# In[12]:
-
-
-# <0 ct
-plt.figure(figsize=[24, 20])
-for idx, c1 in enumerate([0, 0.1, 0.2, 0.4]):
-    ress = ress_dict[c1]
-    vec_ct = np.sum(ress[:, :, 0]< 0, axis=0);
-
-    mat = vec_ct.reshape(len(cans), -1)
-
-    plt.subplot(2, 2, idx+1)
-    plt.title(f"Count {c1}")
-    sns.heatmap(mat, annot=True, fmt=".0f")
-    plt.ylabel("Q")
-    plt.yticks(np.arange(len(cans))+0.5, cans);
-    plt.xlabel("Psi")
-    plt.xticks(np.arange(len(cans))+0.5, cans);
-
-
-# In[17]:
-
-
-# Power
-plt.figure(figsize=[24, 20])
-for idx, c1 in enumerate([0, 0.1, 0.2, 0.4]):
-    ress = ress_dict[c1]
-    vec_ct = np.mean(ress[:, :, 1]< 0.05, axis=0);
-
-    mat = vec_ct.reshape(len(cans), -1)
-
-    plt.subplot(2, 2, idx+1)
-    plt.title(f"Size/Power {c1}")
-    sns.heatmap(mat, annot=True, fmt=".3f")
-    plt.ylabel("Q")
-    plt.yticks(np.arange(len(cans))+0.5, cans, rotation=45);
-    plt.xlabel("Psi")
-    plt.xticks(np.arange(len(cans))+0.5, cans, rotation=45);
-
-
-# In[16]:
-
-
-# Power
-plt.figure(figsize=[24, 20])
-for idx, c1 in enumerate([0, 0.1, 0.2, 0.4]):
-    ress = ress_dict[c1]
-    vec_adj= []
-    for idxx in range(ress.shape[1]):
-        res_T = ress[:, idxx, 0]
-        res_Pval = ress[:, idxx, 1]
-        vec_adj.append(np.mean(res_Pval[res_T>=0]<0.05))
-    vec_adj = np.array(vec_adj);
-    vec_ct = np.mean(ress[:, :, 1]< 0.05, axis=0);
-
-    mat = vec_ct.reshape(len(cans), -1)
-
-    plt.subplot(2, 2, idx+1)
-    plt.title(f"Size/Power {c1}")
-    sns.heatmap(mat, annot=True, fmt=".3f")
-    plt.ylabel("Q")
-    plt.yticks(np.arange(len(cans))+0.5, cans, rotation=45);
-    plt.xlabel("Psi")
-    plt.xticks(np.arange(len(cans))+0.5, cans, rotation=45);
-
-
-# In[15]:
-
-
-import pandas as pd
-all_coms = np.array(list(itertools.product(cans, cans)));
-kpidxs = []
-
-ress = ress_dict[0]
-vec_adj= []
-for idxx in range(ress.shape[1]):
-    res_T = ress[:, idxx, 0]
-    res_Pval = ress[:, idxx, 1]
-    vec_adj.append(np.mean(res_Pval[res_T>=0]<0.05))
-vec_adj = np.array(vec_adj);
-vec  = np.mean(ress[:, :, 1]< 0.05, axis=0);
-kpidx = np.bitwise_and(vec>=0.04, vec<=0.09)
-#kpidx_adj = np.bitwise_and(vec_adj>=0.04, vec_adj<=0.07)
-#kpidx_b = np.bitwise_or(kpidx, kpidx_adj)
-kpidx_b = kpidx
-
-df = []
-for c1 in c1s:
-    ress = ress_dict[c1]
-    vec  = np.mean(ress[:, :, 1]< 0.05, axis=0);
-    df.append(vec[kpidx_b][:, np.newaxis])
-df.append(all_coms[kpidx_b]) 
-df = np.hstack(df)
-df = pd.DataFrame(df) 
-df.columns = c1s+["Q", "Psi"]
-df
-
-
-# In[ ]:
 
 
 
