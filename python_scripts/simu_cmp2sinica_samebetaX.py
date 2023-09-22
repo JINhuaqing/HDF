@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
 from numbers import Number
-import multiprocessing as mp
 
 from easydict import EasyDict as edict
 from tqdm import trange, tqdm
@@ -33,7 +32,11 @@ import itertools
 from scipy.stats import chi2
 
 
-# In[4]:
+# In[3]:
+
+
+
+# In[11]:
 
 
 from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
@@ -45,7 +48,7 @@ from hdf_utils.fns_sinica import coef_fn, fourier_basis_fn, gen_sini_Xthetas
 from hdf_utils.likelihood import obt_lin_tm
 from hdf_utils.SIS import SIS_linear
 from hdf_utils.utils import gen_lam_seq
-from hdf_utils.hypo_test import obt_test_stat
+from hdf_utils.hypo_test import  MS2idxs, obt_test_stat_simple2
 from utils.matrix import col_vec_fn, col_vec2mat_fn, conju_grad, svd_inverse, cholesky_inv
 from utils.functions import logit_fn
 from utils.misc import save_pkl, load_pkl
@@ -59,29 +62,12 @@ from models.linear_model import LinearModel
 
 from joblib import Parallel, delayed
 
-
-# In[5]:
-
-
-import logging
-
-logger = logging.getLogger("tmp")
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-ch = logging.StreamHandler() # for console. 
-ch.setLevel(logging.DEBUG)
-ch.setFormatter(formatter)
-
-logger.addHandler(ch)
-
 import argparse
 parser = argparse.ArgumentParser(description='run')
 parser.add_argument('-c', '--cs', type=float, help='cs value') 
 args = parser.parse_args()
 
-
-# In[6]:
+# In[5]:
 
 
 plt.style.use(FIG_ROOT/"base.mplstyle")
@@ -110,25 +96,28 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 
 # ## Params
 
-# In[7]:
+# In[6]:
 
 
 np.random.seed(0)
+# setting
+cs = [args.cs, 0.0, 0.0] # for sinica paper
+
 paras = edict(def_paras.copy())
 
 # Others
 paras.num_rep = 200 
-paras.init_noise_sd = 0.5 # the sd of the noise added to the true value for initial values
-paras.SIS_ratio = 1 # the ratio to keep with SIS procedure
+paras.init_noise_sd = -1 # the sd of the noise added to the true value for initial values, if -1, make init 0
 paras.SIS_ratio = 0.20 # the ratio to keep with SIS procedure
-paras.svdinv_eps_Q = 0 # now 0 means inverse, small value like 0.01 means remove small eig vals.
-paras.svdinv_eps_Psi = 0
+paras.linear_theta_update="cholesky_inv"
+paras.is_center = True
 
 # candidate sets of tuning parameters, only two 
 # lambda: penalty term
 # N: num of basis
 paras.can_lams = [0.01, 0.1, 0.2, 0.3, 0.4, 0.6, 1, 2, 8]
 paras.can_Ns = [4, 6, 8, 10, 12]
+
 
 # generating dataset
 paras.n = 100 # num of data obs to be genareted
@@ -150,11 +139,10 @@ for N in paras.can_Ns:
 # True parameters
 paras.alp_GT = np.array([0])
 # fourier basis
-cs = [args.cs, args.cs, args.cs] # for sinica paper
 paras.fourier_basis = fourier_basis_fn(paras.x)[:, :]
 paras.fourier_basis_coefs = ([cs[0]*coef_fn(0.2), cs[1]*coef_fn(0.2), cs[2]*coef_fn(0.2)] + 
                              [np.zeros(50)] * (paras.d-3-1) +
-                             [coef_fn(0.2)*1]
+                             [coef_fn(0.2)]
                              )
 paras.fourier_basis_coefs = np.array(paras.fourier_basis_coefs).T 
 paras.beta_GT = paras.fourier_basis @ paras.fourier_basis_coefs 
@@ -167,32 +155,34 @@ paras.Gam_GT_ests = [(np.linalg.inv(basis_mat.numpy().T
                      for basis_mat in paras.basis_mats]
 
 # optimization
+# not used, to use it, you have to know GT
 #Rmins = [(2*(np.linalg.norm(paras.Gam_GT_ests[ix]
 #                            /np.sqrt(paras.can_Ns[ix]), axis=0).sum() 
 #           + np.abs(paras.alp_GT).sum())) 
 #        for ix in range(len(paras.can_Ns))]
-paras.Rmin = 10000
-#without loss of generality, we assume the idxs in M is the first m betas
-paras.sel_idx = np.arange(3, paras.d) # M^c set, 
-paras.num_cv_fold = 5
+#paras.Rmin = np.max(Rmins)
+paras.Rmin = 1000
 paras.Rfct = 2
-#paras.stop_cv = 5e-5
 paras.stop_cv = 5e-4
-#paras.max_iter = 10000
 paras.max_iter = 10000
+paras.num_cv_fold = 5
 
-# misc
-paras.linear_theta_update="cholesky_inv"
-paras.is_center = True
 
 # hypothesis test
+#without loss of generality, we assume the idxs in M is the first m betas
+paras.sel_idx = np.arange(1, paras.d) # M^c set, 
 paras.M_idxs = np.delete(np.arange(paras.d), paras.sel_idx) # the M set
+paras.Cmats = [
+    np.eye(len(paras.M_idxs)), # m x m I matrix, [beta1, beta2] = [0, 0]
+]
+paras.svdinv_eps_Q = 0 # now 0 means inverse, small value like 0.01 means remove small eig vals.
+paras.svdinv_eps_Psi = 0
 
 
-# In[8]:
+# In[7]:
 
 
-paras.save_dir = RES_ROOT/"simu_linear_sinica_samebetaX_test3"
+paras.save_dir = RES_ROOT/f"simu_linear_sinica_samebetaX_test1_{cs[0]*1000:.0f}"
 if not paras.save_dir.exists():
     paras.save_dir.mkdir()
 
@@ -211,7 +201,7 @@ if not paras.save_dir.exists():
 
 
 
-# In[9]:
+# In[8]:
 
 
 def _gen_simu_data_all(seed, paras, verbose=False):
@@ -239,6 +229,7 @@ def _gen_simu_data_all(seed, paras, verbose=False):
             - Y (torch.Tensor): Tensor of shape (n,) containing the response variable.
             - Z (torch.Tensor): Tensor of shape (n, q) containing the covariates.
     """
+    torch.set_default_tensor_type(torch.DoubleTensor)
     np.random.seed(seed)
     _paras = edict(paras.copy())
     # simulated PSD
@@ -246,7 +237,7 @@ def _gen_simu_data_all(seed, paras, verbose=False):
     assert len(_paras.alp_GT) == _paras.q
    
     thetas = gen_sini_Xthetas(_paras.srho, _paras.n, _paras.d);
-    simu_curvs = thetas @ _paras.fourier_basis.T;
+    simu_curvs = thetas @ _paras.fourier_basis.T; # n x d x npts
     simu_covs = gen_covs(_paras.n, _paras.types_)
     
     # linear term and Y
@@ -271,7 +262,7 @@ def _gen_simu_data_all(seed, paras, verbose=False):
     all_data.X = X
     all_data.Y = Y
     all_data.Z = Z
-    all_data.lin_term = lin_term
+    #all_data.lin_term = lin_term
     return all_data
 
 
@@ -289,15 +280,12 @@ def _gen_simu_data_all(seed, paras, verbose=False):
 
 
 
-
-
-
 # ## Simulation
 
-# In[10]:
+# In[9]:
 
 
-def _run_fn(seed, lam, N, paras, is_save=False, is_prg=False, is_cv=False, is_verbose=False):
+def _run_fn(seed, lam, N, paras, is_save=False, is_cv=False, verbose=False):
     """Now (on Aug 25, 2023), if we keep seed the same, the cur_data is the same. 
        If you want to make any changes, make sure this. 
     """
@@ -312,13 +300,13 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_prg=False, is_cv=False, is_ve
     _paras.N = N
     _paras.basis_mat = _paras.basis_mats[_paras.can_Ns.index(N)]
     _paras.Gam_GT_est = paras.Gam_GT_ests[_paras.can_Ns.index(N)]
+    cur_data = _gen_simu_data_all(_paras.seed, _paras)
     
-    f1_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}-c1_{cs[0]*1000:.0f}_est.pkl"
-    f2_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}-c1_{cs[0]*1000:.0f}_cv.pkl"
+    f_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}-c1_{cs[0]*1000:.0f}_est.pkl"
     
     
-    if not (_paras.save_dir/f1_name).exists():
-        cur_data = _gen_simu_data_all(_paras.seed, _paras)
+    res = edict()
+    if not (_paras.save_dir/f_name).exists():
         # do sure independent screening for dim reduction
         if _paras.SIS_ratio < 1:
             keep_idxs, _  = SIS_linear(cur_data.Y, cur_data.X, cur_data.Z, _paras.basis_mats[_paras.can_Ns.index(8)],
@@ -335,10 +323,16 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_prg=False, is_cv=False, is_ve
         cur_data_SIS.X = cur_data.X[:, _paras.keep_idxs, :]
         
         
-        alp_init = (torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd)*0
-        Gam_init = (torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd)*0
-        theta_init = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)]) *0
-        rhok_init = torch.randn(_paras.d_SIS*_paras.N)*0
+        if _paras.init_noise_sd < 0:
+            alp_init = torch.zeros(_paras.q)
+            Gam_init = torch.zeros(_paras.N, _paras.d_SIS)
+            theta_init = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)])
+            rhok_init = torch.zeros(_paras.d_SIS*_paras.N)
+        else:
+            alp_init = torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd
+            Gam_init = torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd
+            theta_init = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)])
+            rhok_init = torch.randn(_paras.d_SIS*_paras.N)
             
         model = LinearModel(Y=cur_data_SIS.Y, 
                             X=cur_data_SIS.X, 
@@ -352,51 +346,98 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_prg=False, is_cv=False, is_ve
         main_res = optimization(model=model, 
                                 penalty=pen, 
                                 inits=[alp_init, Gam_init, theta_init, rhok_init],
-                                is_prg=is_prg,
+                                is_prg=verbose,
                                 save_paras=False,    
                                 input_paras=_paras)
-        res1 = edict()
-        res1._paras = _paras
-        res1.main_res = main_res
-        res1.model = model
-        if is_save:
-            save_pkl(_paras.save_dir/f1_name, res1, verbose=is_verbose)
+        opt = main_res[0]
+        est_Gam = opt.Gamk
+        est_alp = opt.alpk
+        Q_mat = -model.log_lik_der2(est_alp, est_Gam)
+        model.log_lik_der1(est_alp, est_Gam);
+        Sig_mat = (model.log_lik_der1_vs.unsqueeze(-1) * model.log_lik_der1_vs.unsqueeze(1)).mean(axis=0) 
+        est_theta = torch.cat([est_alp, col_vec_fn(est_Gam)/np.sqrt(_paras.N)])
+        nonzero_idxs = torch.nonzero(torch.norm(est_Gam, dim=0)).reshape(-1).numpy()
+        MS_unions = np.sort(np.union1d(_paras.M_idxs, nonzero_idxs))
+        keep_idxs_test = MS2idxs(_paras.q, _paras.N, MS_unions)
+        Q_mat_part = Q_mat[keep_idxs_test][:, keep_idxs_test]
+        Sig_mat_part = Sig_mat[keep_idxs_test][:, keep_idxs_test]
+        
+        res = edict()
+        _paras.Gam_GT_ests = None
+        _paras.basis_mats = None
+        _paras.fourier_basis_coefs = None
+        _paras.fourier_basis = None
+        res._paras = _paras
+        res.Sig_mat_part = Sig_mat_part
+        res.Q_mat_part = Q_mat_part
+        res.est_Gam = est_Gam
+        res.est_alp = est_alp
+        res.conv_num = main_res[1]
     
-    if is_cv:
-        res1 = load_pkl(_paras.save_dir/f1_name, verbose=is_verbose)
-        _paras = res1._paras
-        cur_data_SIS = edict()
-        cur_data_SIS.X = res1.model.X
-        cur_data_SIS.Y = res1.model.Y
-        cur_data_SIS.Z = res1.model.Z
-        
-        
-        pen = SCAD(lams=_paras.lam, a=_paras.a,  sel_idx=_paras.sel_idx_SIS)
-        
-        # use a diff initial to reduce the overfitting
-        alp_init1 = (torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd)*0
-        Gam_init1 = (torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd) *0
-        theta_init1 = torch.cat([alp_init1, col_vec_fn(Gam_init1)/np.sqrt(_paras.N)])*0
-        rhok_init1 = torch.randn(_paras.d_SIS*_paras.N)*0
-        cv_errs = CV_err_linear_fn(data=cur_data_SIS, 
-                                   penalty=pen, 
-                                   num_cv_fold=_paras.num_cv_fold,
-                                   # do not use estimated value for initial, severe overfitting !!! (on Aug 25, 2023)
-                                   inits=[alp_init1, Gam_init1, theta_init1, rhok_init1], 
-                                   is_prg=is_prg, 
-                                   save_paras=False,    
-                                   input_paras=_paras)
+        if is_cv:
+            if _paras.init_noise_sd < 0:
+                alp_init1 = torch.zeros(_paras.q)
+                Gam_init1 = torch.zeros(_paras.N, _paras.d_SIS)
+                theta_init1 = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)])
+                rhok_init1 = torch.zeros(_paras.d_SIS*_paras.N)
+            else:
+                # use a diff initial to reduce the overfitting
+                alp_init1 = torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd
+                Gam_init1 = torch.Tensor(_paras.Gam_GT_est[:, _paras.keep_idxs]) + torch.randn(_paras.N, _paras.d_SIS)*_paras.init_noise_sd
+                theta_init1 = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)])
+                rhok_init1 = torch.randn(_paras.d_SIS*_paras.N)
+            cv_errs = CV_err_linear_fn(data=cur_data_SIS, 
+                                       penalty=pen, 
+                                       num_cv_fold=_paras.num_cv_fold,
+                                       # do not use estimated value for initial, severe overfitting !!! (on Aug 25, 2023)
+                                       inits=[alp_init1, Gam_init1, theta_init1, rhok_init1], 
+                                       is_prg=verbose, 
+                                       save_paras=False,    
+                                       input_paras=_paras)
             
-        res2 = edict()
-        res2.cv_errs = cv_errs
+            res.cv_errs = cv_errs
+        else:
+            res.cv_errs = None
         if is_save:
-            save_pkl(_paras.save_dir/f2_name, res2, verbose=is_verbose)
-    return None
+            save_pkl(_paras.save_dir/f_name, res, verbose=verbose)
+    return res
 
 
+# In[10]:
 
-all_coms = itertools.product(range(0, paras.num_rep), paras.can_lams, paras.can_Ns);
-with Parallel(n_jobs=25) as parallel:
-    ress = parallel(delayed(_run_fn)(seed, lam=lam, N=N, paras=paras, is_save=True, is_cv=True) for seed, lam, N 
+
+def _test_fn(Cmat, est_res, svdinv_eps_Q=0, svdinv_eps_Psi=0, 
+             is_save=False, verbose=False):
+    torch.set_default_tensor_type(torch.DoubleTensor)
+    _paras = est_res._paras
+    _paras.svdinv_eps_Q = svdinv_eps_Q
+    _paras.svdinv_eps_Psi = svdinv_eps_Psi
+    f_name = f"seed_{_paras.seed:.0f}-lam_{_paras.lam*1000:.0f}-N_{_paras.N:.0f}_test_stat.pkl"
+    
+    T_v = obt_test_stat_simple2(Q_mat_part=est_res.Q_mat_part, 
+                               Sig_mat_part=est_res.Sig_mat_part,
+                               est_alp=est_res.est_alp, 
+                               est_Gam=est_res.est_Gam,
+                               Cmat=Cmat,
+                               paras=_paras,
+                               ).item() 
+    pval = chi2.sf(T_v, Cmat.shape[0]*_paras.N)
+    
+    res = edict()
+    res.T_v = T_v
+    res.pval = pval
+    res.Cmat = Cmat
+    if is_save:
+        save_pkl(_paras.save_dir/f_name, res, verbose=verbose)
+    return res
+
+
+# In[ ]:
+
+
+all_coms = itertools.product(range(0, paras.num_rep), paras.can_lams, paras.can_Ns)
+with Parallel(n_jobs=30) as parallel:
+    ress = parallel(delayed(_run_fn)(seed, lam=lam, N=N, paras=paras, is_save=True, is_cv=True, verbose=False) 
+                    for seed, lam, N 
                     in tqdm(all_coms, total=len(paras.can_Ns)*len(paras.can_lams)*paras.num_rep))
 

@@ -77,7 +77,7 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
             alp_diff = opt.alpk - last_alpk
             alp_diff_norm = torch.norm(alp_diff)/(torch.norm(opt.alpk)+eps)
             
-            Gam_diff = opt.Gamk- last_Gamk
+            Gam_diff = opt.Gamk - last_Gamk
             Gam_diff_norm = torch.norm(Gam_diff)/(torch.norm(opt.Gamk)+eps)
             
             theta_diff = opt.thetak - last_thetak
@@ -112,6 +112,6 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
     if _paras.is_small:
         opt.model = None
     if save_paras:
-        return opt, ix!=(_paras.max_iter-1), _paras
+        return opt, (ix+1, _paras.max_iter), _paras
     else:
-        return opt, ix!=(_paras.max_iter-1)
+        return opt, (ix+1, _paras.max_iter)
