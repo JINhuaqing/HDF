@@ -2,7 +2,8 @@
 % use it as a template to get other script.
 clear all;
 % always use this working directory
-cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+%cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+cd '/wynton/home/rajlab/hjin/MyResearch/HDF/matlab_scripts/'
 %cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
 
 addpath sinica_code/my_own/
@@ -16,10 +17,11 @@ sn_upper = 30; % upper bd of sn
 
 %% 1.1 path
 root_data_folder = '../mid_results/matlab_simu_data/';
-data_folder = 'SinicaX_lastbeta02_d-200_n-100/';
+data_folder = 'SinicaX_d-200_n-100_test1_setting2/';
 
 % setting when c1=0, H0, c1>0 H1
-c1 = 0.1;
+c1 = 0.60; %!!!
+num_rep = 1000;
 
 % m: equally spaced points on [a,b]
 m = 100;
@@ -40,7 +42,6 @@ a=0; b=1; % the funcitional curve is defined on [a,b]=[0,1]
 grids=mgrids(a,b,m);
 
 
-num_rep = 200;
 
 % parallel runing
 parpool(25);
@@ -49,7 +50,7 @@ parfor rep_ix = 1:num_rep
     %% 1.4 data
     %rep_ix = 1;
     %cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
-    fil_name = ['c1_' num2str(c1*10) '_seed_' num2str(rep_ix-1)]
+    fil_name = ['c1_' num2str(c1*1000) '_seed_' num2str(rep_ix-1)]
     fil_name
     cur_data = load([root_data_folder data_folder fil_name '.mat']);
     [n, pn, ~] = size(cur_data.X_centered);
