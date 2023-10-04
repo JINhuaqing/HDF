@@ -4,6 +4,7 @@ from rpy2 import robjects as robj
 
 _r = robj.r
 _r["library"]("splines")
+_r["library"]("orthogonalsplinebasis");
 _r_bs = _r['bs']
 
 def obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept=1):
@@ -43,4 +44,21 @@ def obt_bsp_basis_Rfn_wrapper(x, N, bsp_ord, intercept=1):
     iknots = aknots_raw[1:-1]
     bknots = np.array([0, 1])
     basis_mat = obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept)
+    return np.array(basis_mat)
+
+def obt_bsp_obasis_Rfn(x, N, bsp_ord):
+    """
+        Obtain the b-spline basis for given Num of basis and degree
+        args:
+            x: the locs you want to evaluate
+            N: Num of basis
+            bsp_ord: the order of b-spline; degree = order-1
+            
+    """
+    knots = np.linspace(0, 1, N-(bsp_ord-2))
+    eknots = _r["expand.knots"](robj.FloatVector(knots), order=bsp_ord);
+    
+    #basis_obj = _r['SplineBasis'](eknots, order=bsp_ord)
+    basis_obj = _r['OBasis'](eknots, order=bsp_ord)
+    basis_mat = _r['evaluate'](basis_obj, robj.FloatVector(x));
     return np.array(basis_mat)

@@ -47,7 +47,7 @@ def conju_grad(A, vec, maxIter=1000, eps=1e-9):
 
 def Dmat_opt(v, q):
     """args:
-            v: vector of qxdN
+            v: vector of q+dN
       return Dmat x v
        Dmat = [0_dNxq, I_dNxdN]
     """
