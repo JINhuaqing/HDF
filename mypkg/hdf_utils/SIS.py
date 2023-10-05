@@ -2,6 +2,7 @@
 import numpy as np
 from easydict import EasyDict as edict
 import torch
+#import pdb
 
 def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
     """The function is to do the sure ind screening when d (num of ROIs) is large under linear model
@@ -28,8 +29,8 @@ def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
         vec_p2 = tmp_BX*np.sqrt(N)
         vec_p = torch.cat([Z, vec_p2], dim=1)
         
-        right_vec = torch.sum(vec_p * Y.unsqueeze(-1), axis=0)
-        left_mat = torch.sum(vec_p.unsqueeze(-1) * vec_p.unsqueeze(1), axis=0)
+        right_vec = torch.mean(vec_p * Y.unsqueeze(-1), axis=0)
+        left_mat = torch.mean(vec_p.unsqueeze(-1) * vec_p.unsqueeze(1), axis=0)
         # ridge penalty
         left_mat = left_mat + torch.eye(left_mat.shape[0])*ridge_pen
         cur_gam = torch.linalg.solve(left_mat, right_vec)[_paras.q:] * np.sqrt(N)
