@@ -2,7 +2,8 @@
 import numpy as np
 from easydict import EasyDict as edict
 import torch
-#import pdb
+import pdb
+#from utils.matrix import conju_grad
 
 def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
     """The function is to do the sure ind screening when d (num of ROIs) is large under linear model
@@ -31,9 +32,11 @@ def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
         
         right_vec = torch.mean(vec_p * Y.unsqueeze(-1), axis=0)
         left_mat = torch.mean(vec_p.unsqueeze(-1) * vec_p.unsqueeze(1), axis=0)
+        #pdb.set_trace()
         # ridge penalty
         left_mat = left_mat + torch.eye(left_mat.shape[0])*ridge_pen
         cur_gam = torch.linalg.solve(left_mat, right_vec)[_paras.q:] * np.sqrt(N)
+        #cur_gam = conju_grad(left_mat, right_vec)[_paras.q:] * np.sqrt(N)
         SIS_gams.append(cur_gam.numpy())
     SIS_gams = np.array(SIS_gams)
     SIS_betas = basis_mat.numpy() @ SIS_gams.T
