@@ -17,11 +17,12 @@ sn_upper = 30; % upper bd of sn
 
 %% 1.1 path
 root_data_folder = '../mid_results/matlab_simu_data/';
-data_folder = 'SinicaX_d-200_n-100_test1_setting1/';
+data_folder = 'SinicaX_d-200_n-100_setting1b/';
 
 % setting when c1=0, H0, c1>0 H1
-c1 = 0.40;
-num_rep = 1000;
+Hn = [1, 2];
+c1 = 0.00;
+num_rep = 200;
 
 % m: equally spaced points on [a,b]
 m = 100;
@@ -32,9 +33,9 @@ lams_d = lamdaseq(0, 0.4, 10); % lam seqs for dantizig
 
 %% 1.3 eta estimate
 sns = 1:3:sn_upper; % candidate seq of sn
-folds=5;
-upper=10;
-n_lam =20;
+folds = 5;
+upper = 10;
+n_lam = 10;
 lams_eta =lamdaseq(0,upper,n_lam); % lam seq for eta
 
 a=0; b=1; % the funcitional curve is defined on [a,b]=[0,1]
@@ -205,7 +206,7 @@ parfor rep_ix = 1:num_rep
     
     
     %% Hypotheis test
-    Hn = [1];
+    % Hn = [1];
     N=10000; %we assume to have N=1000 bootstrap sample size
     %N=200000; %we assume to have N=1000 bootstrap sample size
     alpha=0.05;% we assume alpha'th quantile

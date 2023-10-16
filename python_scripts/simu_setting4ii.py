@@ -5,7 +5,7 @@
 # 
 # It is under the linear setting
 # 
-# Now, I use the same X and beta from the paper (on Sep 4, 2023)
+# Now, I use the same beta from the paper but the PSD as X
 
 # In[1]:
 
@@ -32,18 +32,14 @@ import itertools
 from scipy.stats import chi2
 
 
-# In[3]:
 
-
-
-# In[11]:
+# In[6]:
 
 
 from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
 from default_paras import def_paras
 
-from hdf_utils.data_gen import gen_covs, gen_simu_psd, gen_simu_ts
-from hdf_utils.fns import fn1, fn2, fn3, fn4, fn5, zero_fn
+from hdf_utils.data_gen import gen_covs, gen_simu_psd
 from hdf_utils.fns_sinica import coef_fn, fourier_basis_fn, gen_sini_Xthetas
 from hdf_utils.likelihood import obt_lin_tm
 from hdf_utils.SIS import SIS_linear
@@ -52,7 +48,7 @@ from hdf_utils.hypo_test import  MS2idxs, obt_test_stat_simple2
 from utils.matrix import col_vec_fn, col_vec2mat_fn, conju_grad, svd_inverse, cholesky_inv
 from utils.functions import logit_fn
 from utils.misc import save_pkl, load_pkl
-from splines import obt_bsp_basis_Rfn, obt_bsp_basis_Rfn_wrapper
+from splines import obt_bsp_obasis_Rfn, obt_bsp_basis_Rfn_wrapper
 from projection import euclidean_proj_l1ball
 from optimization.one_step_opt import OneStepOpt
 from optimization.cross_validation import CV_err_linear_fn
@@ -67,7 +63,7 @@ parser = argparse.ArgumentParser(description='run')
 parser.add_argument('-c', '--cs', type=float, help='cs value') 
 args = parser.parse_args()
 
-# In[5]:
+# In[18]:
 
 
 plt.style.use(FIG_ROOT/"base.mplstyle")
@@ -96,44 +92,47 @@ torch.set_default_tensor_type(torch.DoubleTensor)
 
 # ## Params
 
-# In[6]:
+# In[75]:
 
 
-np.random.seed(0)
-# setting
 cs = [args.cs, 0.0, 0.0] # for sinica paper
-
+obt_bsp = obt_bsp_obasis_Rfn
+np.random.seed(0)
 paras = edict(def_paras.copy())
+
+
 
 # Others
 paras.num_rep = 200 
 paras.init_noise_sd = -1 # the sd of the noise added to the true value for initial values, if -1, make init 0
-paras.SIS_ratio = 0.20 # the ratio to keep with SIS procedure
+#paras.SIS_ratio = 1 # the ratio to keep with SIS procedure
+paras.SIS_ratio = 0.2 # the ratio to keep with SIS procedure
 paras.linear_theta_update="cholesky_inv"
 paras.is_center = True
 
 # candidate sets of tuning parameters, only two 
 # lambda: penalty term
 # N: num of basis
-paras.can_lams = [0.01, 0.1, 0.2, 0.3, 0.4, 0.6, 1, 2, 8]
+paras.can_lams = [0.001, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.50, 2]
 paras.can_Ns = [4, 6, 8, 10, 12]
 
 
 # generating dataset
 paras.n = 100 # num of data obs to be genareted
 paras.npts = 100 # num of pts to evaluate X(s)
+paras.freqs = np.linspace(2, 45, paras.npts) # freqs
 paras.d = 200 # num of ROIs
 paras.q = 1 # num of other covariates
 paras.sigma2 = 1 # variance of the error
 paras.types_ = ["int"]
-paras.srho = 0.3 # corr from sinica
+paras.is_std = False # whether to std PSD across freq or not
 
 # b-spline
 paras.x = np.linspace(0, 1, paras.npts)
 paras.basis_mats = []
 for N in paras.can_Ns:
     paras.basis_mats.append(
-        torch.tensor(obt_bsp_basis_Rfn_wrapper(paras.x, N, paras.ord)).to(torch.get_default_dtype())
+        torch.tensor(obt_bsp(paras.x, N, paras.ord)).to(torch.get_default_dtype())
     )
 
 # True parameters
@@ -145,8 +144,9 @@ paras.fourier_basis_coefs = ([cs[0]*coef_fn(0.2), cs[1]*coef_fn(0.2), cs[2]*coef
                              [coef_fn(0.2)]
                              )
 paras.fourier_basis_coefs = np.array(paras.fourier_basis_coefs).T 
-paras.beta_GT = paras.fourier_basis @ paras.fourier_basis_coefs 
-print(np.linalg.norm(paras.beta_GT, axis=0))
+paras.beta_GT = paras.fourier_basis @ paras.fourier_basis_coefs
+beta_GT_norm = np.linalg.norm(paras.beta_GT, axis=0)
+print(beta_GT_norm)
 
 paras.Gam_GT_ests = [(np.linalg.inv(basis_mat.numpy().T 
                                   @ basis_mat.numpy()) 
@@ -161,11 +161,13 @@ paras.Gam_GT_ests = [(np.linalg.inv(basis_mat.numpy().T
 #           + np.abs(paras.alp_GT).sum())) 
 #        for ix in range(len(paras.can_Ns))]
 #paras.Rmin = np.max(Rmins)
-paras.Rmin = 1000
+paras.Rmin = 100000
 paras.Rfct = 2
 paras.stop_cv = 5e-4
 paras.max_iter = 10000
-paras.num_cv_fold = 5
+paras.num_cv_fold = paras.n # LOO
+# it is the parametes for SCAD
+paras.a = 2.7 # before (on Oct 10, 2023), it is 3.7 by default. 
 
 
 # hypothesis test
@@ -179,10 +181,8 @@ paras.svdinv_eps_Q = 0 # now 0 means inverse, small value like 0.01 means remove
 paras.svdinv_eps_Psi = 0
 
 
-# In[7]:
-
-
-paras.save_dir = RES_ROOT/f"simu_linear_sinica_samebetaX_test1_{cs[0]*1000:.0f}"
+# saving path
+paras.save_dir = RES_ROOT/f"simu_setting4ii_{cs[0]*1000:.0f}"
 if not paras.save_dir.exists():
     paras.save_dir.mkdir()
 
@@ -201,18 +201,51 @@ if not paras.save_dir.exists():
 
 
 
-# In[8]:
+# In[12]:
 
 
-def _gen_simu_data_all(seed, paras, verbose=False):
+def _is_exists(tmp_paras):
+    """
+    Check if a file with the given parameters exists.
+
+    Args:
+    tmp_paras:
+        d (int): The value of d in the file name.
+        n (int): The value of n in the file name.
+        npts:
+        is_std
+        seed (int): The seed value in the file name.
+
+    Returns:
+    bool or Path: Returns the file path if the file exists, otherwise returns False.
+    """
+    _get_n = lambda fil: int(fil.stem.split("_")[2].split("-")[-1])
+    fils = MIDRES_ROOT.glob(f"PSD_d-{tmp_paras.d}_n-*npts-{tmp_paras.npts}_is_std-{tmp_paras.is_std}")
+    # We do not need fil with n as we know the data with corresponding seed does not exist
+    fils = [fil for fil in fils if _get_n(fil) !=tmp_paras.n]
+    if len(fils) == 0:
+        return False
+    else:
+        fils = sorted(fils, key=_get_n)
+        ns = np.array([_get_n(fil) for fil in fils])
+        idxs = np.where(tmp_paras.n <= ns)[0]
+        if len(idxs) == 0:
+            return False
+        else:
+            fil =fils[idxs[0]]
+            path = MIDRES_ROOT/fil/f"seed_{tmp_paras.seed}.pkl"
+            return path if path.exists() else False
+def _get_filename(params):
+    keys = ["d", "n", "npts", "is_std"]
+    folder_name = 'PSD_'+'_'.join(f"{k}-{params[k]}" for k in keys)
+    return folder_name + f'/seed_{params.seed}.pkl'
+def _gen_simu_data_all(seed, paras, verbose=False, is_gen=False):
     """
     Generate simulated data for all parameters.
 
     Args:
         seed (int): Seed for random number generator.
         paras (dict): Dictionary containing the following parameters:
-            - srho: corr from sinica
-            - fourier_basis: The fourier basis for generating X, npts x nbasis
             - n (int): Number of samples.
             - d (int): Number of dimensions.
             - q (int): Number of covariates.
@@ -222,6 +255,7 @@ def _gen_simu_data_all(seed, paras, verbose=False):
             - freqs (list): List of frequencies for generating simulated PSD.
             - sigma2 (float): Variance of the noise.
         verbose(bool): Verbose or not
+        is_gen(bool): Only for generating or not. If True, only checking or generating X, not return anything.
 
     Returns:
         all_data (dict): Dictionary containing the following simulated data:
@@ -229,15 +263,41 @@ def _gen_simu_data_all(seed, paras, verbose=False):
             - Y (torch.Tensor): Tensor of shape (n,) containing the response variable.
             - Z (torch.Tensor): Tensor of shape (n, q) containing the covariates.
     """
-    torch.set_default_tensor_type(torch.DoubleTensor)
     np.random.seed(seed)
     _paras = edict(paras.copy())
     # simulated PSD
     assert len(_paras.types_) == _paras.q
     assert len(_paras.alp_GT) == _paras.q
-   
-    thetas = gen_sini_Xthetas(_paras.srho, _paras.n, _paras.d);
-    simu_curvs = thetas @ _paras.fourier_basis.T; # n x d x npts
+    tmp_paras = edict()
+    tmp_paras.seed = seed 
+    tmp_paras.n = _paras.n
+    tmp_paras.d = _paras.d
+    tmp_paras.npts = _paras.npts
+    tmp_paras.is_std = _paras.is_std
+    
+    file_path = MIDRES_ROOT/_get_filename(tmp_paras)
+    if file_path.exists():
+        if is_gen:
+            return None
+        simu_curvs = load_pkl(file_path, verbose=verbose)
+    else:
+        ofil =  _is_exists(tmp_paras)
+        if ofil:
+            if is_gen:
+                return None
+            simu_curvs = load_pkl(ofil, verbose=verbose)
+        else:
+            if _paras.is_std:
+                simu_curvs = gen_simu_psd(_paras.n, _paras.d, _paras.freqs, prior_sd=10, n_jobs=28, is_prog=False, is_std=_paras.is_std)
+            else:
+                simu_curvs = gen_simu_psd(_paras.n, _paras.d, _paras.freqs, prior_sd=10, n_jobs=28, is_prog=False, is_std=_paras.is_std)
+                simu_curvs = simu_curvs - simu_curvs.mean(axis=-1, keepdims=True); # not std, but center it
+            save_pkl(file_path, simu_curvs, verbose=verbose)
+    if is_gen:
+        return None
+    simu_curvs = simu_curvs[:_paras.n]
+    simu_curvs = (simu_curvs + np.random.randn(*simu_curvs.shape)*3)*1 # larger
+    #simu_curvs = np.random.randn(_paras.n, _paras.d, _paras.npts)* 10
     simu_covs = gen_covs(_paras.n, _paras.types_)
     
     # linear term and Y
@@ -250,8 +310,9 @@ def _gen_simu_data_all(seed, paras, verbose=False):
     # Y 
     Y = lin_term + np.random.randn(_paras.n)*np.sqrt(_paras.sigma2)
     
-    Y_centered = Y - Y.mean(axis=0, keepdims=True)
+    # center
     X_centered = simu_curvs - simu_curvs.mean(axis=0, keepdims=True)
+    Y_centered = Y - Y.mean(axis=0, keepdims=True)
     
     # To torch
     X = torch.Tensor(X_centered) # n x d x npts
@@ -262,19 +323,13 @@ def _gen_simu_data_all(seed, paras, verbose=False):
     all_data.X = X
     all_data.Y = Y
     all_data.Z = Z
-    #all_data.lin_term = lin_term
+    all_data.lin_term = lin_term
     return all_data
-
-
-# In[ ]:
-
-
-
 
 
 # # Simu
 
-# In[ ]:
+
 
 
 
@@ -282,7 +337,7 @@ def _gen_simu_data_all(seed, paras, verbose=False):
 
 # ## Simulation
 
-# In[9]:
+# In[19]:
 
 
 def _run_fn(seed, lam, N, paras, is_save=False, is_cv=False, verbose=False):
@@ -309,8 +364,8 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_cv=False, verbose=False):
     if not (_paras.save_dir/f_name).exists():
         # do sure independent screening for dim reduction
         if _paras.SIS_ratio < 1:
-            keep_idxs, _  = SIS_linear(cur_data.Y, cur_data.X, cur_data.Z, _paras.basis_mats[_paras.can_Ns.index(8)],
-                                       _paras.SIS_ratio, _paras, ridge_pen=1)
+            keep_idxs, _  = SIS_linear(cur_data.Y, cur_data.X, cur_data.Z, _paras.basis_mats[_paras.can_Ns.index(6)],
+                                       _paras.SIS_ratio, _paras, ridge_pen=0)
         else:
             keep_idxs = _paras.sel_idx
         M_idxs = np.delete(np.arange(_paras.d), _paras.sel_idx)
@@ -338,7 +393,8 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_cv=False, verbose=False):
                             X=cur_data_SIS.X, 
                             Z=cur_data_SIS.Z, 
                             basis_mat=_paras.basis_mat, 
-                            sigma2=_paras.sigma2)
+                            sigma2=1)
+                            #sigma2=_paras.sigma2)
         # 3e0
         pen = SCAD(lams=_paras.lam, a=_paras.a,  sel_idx=_paras.sel_idx_SIS)
             
@@ -373,6 +429,7 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_cv=False, verbose=False):
         res.est_Gam = est_Gam
         res.est_alp = est_alp
         res.conv_num = main_res[1]
+        res.resids = torch.mean((model.Y - model._obt_lin_tm(est_alp, est_Gam))**2)
     
         if is_cv:
             if _paras.init_noise_sd < 0:
@@ -403,41 +460,12 @@ def _run_fn(seed, lam, N, paras, is_save=False, is_cv=False, verbose=False):
     return res
 
 
-# In[10]:
-
-
-def _test_fn(Cmat, est_res, svdinv_eps_Q=0, svdinv_eps_Psi=0, 
-             is_save=False, verbose=False):
-    torch.set_default_tensor_type(torch.DoubleTensor)
-    _paras = est_res._paras
-    _paras.svdinv_eps_Q = svdinv_eps_Q
-    _paras.svdinv_eps_Psi = svdinv_eps_Psi
-    f_name = f"seed_{_paras.seed:.0f}-lam_{_paras.lam*1000:.0f}-N_{_paras.N:.0f}_test_stat.pkl"
-    
-    T_v = obt_test_stat_simple2(Q_mat_part=est_res.Q_mat_part, 
-                               Sig_mat_part=est_res.Sig_mat_part,
-                               est_alp=est_res.est_alp, 
-                               est_Gam=est_res.est_Gam,
-                               Cmat=Cmat,
-                               paras=_paras,
-                               ).item() 
-    pval = chi2.sf(T_v, Cmat.shape[0]*_paras.N)
-    
-    res = edict()
-    res.T_v = T_v
-    res.pval = pval
-    res.Cmat = Cmat
-    if is_save:
-        save_pkl(_paras.save_dir/f_name, res, verbose=verbose)
-    return res
-
-
-# In[ ]:
+# In[20]:
 
 
 all_coms = itertools.product(range(0, paras.num_rep), paras.can_lams, paras.can_Ns)
-with Parallel(n_jobs=30) as parallel:
-    ress = parallel(delayed(_run_fn)(seed, lam=lam, N=N, paras=paras, is_save=True, is_cv=True, verbose=False) 
+num_cv = 50
+with Parallel(n_jobs=35) as parallel:
+    ress = parallel(delayed(_run_fn)(seed, lam=lam, N=N, paras=paras, is_save=True, is_cv=(seed<num_cv), verbose=False) 
                     for seed, lam, N 
                     in tqdm(all_coms, total=len(paras.can_Ns)*len(paras.can_lams)*paras.num_rep))
-

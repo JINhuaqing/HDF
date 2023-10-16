@@ -8,15 +8,15 @@
 ##### set job working directory
 #$ -wd  /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/
 #### Specify job name
-#$ -N j89_N_no
+#$ -N S1d_040
 #### Output file
-#$ -o wynton/logs/Realdata_$JOB_NAME_$JOB_ID.out
+#$ -o wynton/logs/$JOB_NAME_$JOB_ID.out
 #### Error file
-#$ -e wynton/logs/Realdata_$JOB_NAME_$JOB_ID.err
+#$ -e wynton/logs/$JOB_NAME_$JOB_ID.err
 #### memory per core
 #$ -l mem_free=2G
 #### number of cores 
-#$ -pe smp 30
+#$ -pe smp 40
 #### Maximum run time 
 #$ -l h_rt=48:00:00
 #### job requires up to 2 GB local space
@@ -28,9 +28,8 @@
 #### The GPU memory required, in MiB
 ### #$ -l gpu_mem=12000M
 
+echo "Starting running"
 
+singularity exec ~/MyResearch/hdf_snsfix.sif python -u ../python_scripts/simu_setting1d.py --cs 0.4
 
-singularity exec ~/MyResearch/hdf_latest.sif python ../python_scripts/real_data_run.py
-
-#### End-of-job summary, if running as a job
 [[ -n "$JOB_ID" ]] && qstat -j "$JOB_ID"

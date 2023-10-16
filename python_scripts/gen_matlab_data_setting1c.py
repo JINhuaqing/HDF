@@ -58,6 +58,10 @@ from splines import obt_bsp_basis_Rfn, obt_bsp_basis_Rfn_wrapper
 from joblib import Parallel, delayed
 
 
+import argparse
+parser = argparse.ArgumentParser(description='run')
+parser.add_argument('-c', '--cs', type=float, help='cs value') 
+args = parser.parse_args()
 # In[5]:
 
 
@@ -100,7 +104,8 @@ paras.x = np.linspace(0, 1, paras.npts)
 
 paras.alp_GT = np.array([0])
 # fourier basis
-cs = [0.2, 0.0, 0.0] # for sinica paper
+cs = [args.cs, 0.0, 0.0] # for sinica paper
+postfix = "_setting1c"
 paras.fourier_basis = fourier_basis_fn(paras.x)[:, :]
 paras.fourier_basis_coefs = ([cs[0]*coef_fn(0.2), cs[1]*coef_fn(0.2), cs[2]*coef_fn(0.2)] + 
                              [np.zeros(50)] * (paras.d-3-1) +
@@ -144,6 +149,7 @@ def _gen_simu_data_sinica(seed, paras):
             - Y (torch.Tensor): Tensor of shape (n,) containing the response variable.
             - Z (torch.Tensor): Tensor of shape (n, q) containing the covariates.
     """
+    torch.set_default_tensor_type(torch.DoubleTensor)
     np.random.seed(seed)
     _paras = edict(paras.copy())
     # simulated PSD
@@ -162,7 +168,9 @@ def _gen_simu_data_sinica(seed, paras):
     lin_term = cov_part + int_part
     
     # Y 
-    Y = lin_term + np.random.randn(_paras.n)*np.sqrt(_paras.sigma2)
+    errs_raw = np.random.lognormal(0, 1, _paras.n)
+    errs = np.sqrt(_paras.sigma2)*(errs_raw - errs_raw.mean())/errs_raw.std()
+    Y = lin_term + errs
 
     # for Sinica paper, center X and Y
     Y_centered = Y - Y.mean(axis=0, keepdims=True)
@@ -185,17 +193,6 @@ def _gen_simu_data_sinica(seed, paras):
 # In[9]:
 
 
-# check whether my seed can control the randonness or not 
-if False:
-    seed = 1
-    a, b = _gen_simu_data_sinica(seed, paras);
-    res = load_pkl(RES_ROOT/"simu_linear_sinica_samebetaX_tmp"/f"seed_{seed}-lam_200-N_12-c1_{cs[0]*1000:.0f}_est.pkl", verbose=False);
-    print((a.Y - res.cur_data.Y).norm(), (a.X - res.cur_data.X).norm())
-
-
-# In[ ]:
-
-
 
 
 
@@ -209,7 +206,7 @@ from scipy.io import savemat
 def _get_filename_mat(params, seed):
     params = edict(params.copy())
     keys = ["d", "n"]
-    folder_name = 'SinicaX_'+'_'.join(f"{k}-{params[k]}" for k in keys) + "_test1"
+    folder_name = 'SinicaX_'+'_'.join(f"{k}-{params[k]}" for k in keys) + postfix
     folder_name = MIDRES_ROOT/f"matlab_simu_data/{folder_name}"
     if not folder_name.exists():
         folder_name.mkdir()
@@ -219,9 +216,8 @@ def _run_fn(seed):
     _, sinica_data = _gen_simu_data_sinica(seed, paras)
     savemat(_get_filename_mat(paras, seed), sinica_data)
     return None
-with Parallel(n_jobs=25) as parallel:
+with Parallel(n_jobs=35) as parallel:
     ress = parallel(delayed(_run_fn)(seed) for seed in tqdm(range(paras.num_rep), total=paras.num_rep))
 
 
-# In[11]:
 
