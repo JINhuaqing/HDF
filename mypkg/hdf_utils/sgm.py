@@ -137,7 +137,7 @@ class SGM:
             is_std: std the psd across freq axis or not, default is True
     
         Returns:
-            model_out(array): PSD in dB, and standardized
+            model_out(array): PSD in dB, (maybe standardized)
     
         """
     

@@ -3,6 +3,7 @@ import numpy as np
 from easydict import EasyDict as edict
 from utils.matrix import col_vec_fn
 import logging
+import pdb
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.WARNING)
@@ -173,6 +174,48 @@ def obt_test_stat_simple2(Q_mat_part, Sig_mat_part, est_alp, est_Gam, Cmat, para
     # calculate Test stats
     Q_mat_part_inv = torch.linalg.pinv(Q_mat_part, hermitian=True, rtol=_paras.svdinv_eps_Q)
     Psi = Amat @ Q_mat_part_inv @ Sig_mat_part @ Q_mat_part_inv @ Amat.T
+    Psi_inv = torch.linalg.pinv(Psi, hermitian=True, rtol=_paras.svdinv_eps_Psi)
+    
+    T_p1 = Amat @ est_theta[keep_idxs_test]
+    T_v = T_p1 @ Psi_inv @ T_p1 * _paras.n 
+    return T_v
+
+def obt_test_stat_simple3(est_sigma2, Q_mat_part, est_alp, est_Gam, Cmat, paras):
+    """
+    Obtain the test statistics via the estimator, even simpler than simple2
+
+    Args:
+        est_sigma2: estimation of variance of error
+        Q_mat_part: Second der of model
+        est_alp: Estimated alp parameters
+        est_Gam: Estimated Gam parameters
+        Cmat: Hypothesis mat, r x m
+        paras: Dictionary containing parameters for the test
+            - N: Number of samples
+            - M_idxs: Indices of the M set
+            - q: Number of ROIs
+            - svdinv_eps_Q: Threshold for inverse of Q matrix
+            - svdinv_eps_Psi: Threshold for inverse of Psi matrix
+            - n: Number of observations
+
+    Returns:
+        T_v: Test statistic value
+    """
+    _paras = edict(paras.copy())
+    est_theta = torch.cat([est_alp, col_vec_fn(est_Gam)/np.sqrt(_paras.N)])
+    
+    # obtain the idxs to keep for test
+    nonzero_idxs = torch.nonzero(torch.norm(est_Gam, dim=0)).reshape(-1).numpy()
+    MS_unions = np.sort(np.union1d(_paras.M_idxs, nonzero_idxs))
+    keep_idxs_test = MS2idxs(_paras.q, _paras.N, MS_unions)
+    
+    # A mat
+    k = len(np.setdiff1d(nonzero_idxs, _paras.M_idxs))
+    Amat = torch.Tensor(get_Amat(k, Cmat, _paras))
+    
+    # calculate Test stats
+    Q_mat_part_inv = torch.linalg.pinv(Q_mat_part, hermitian=True, rtol=_paras.svdinv_eps_Q)
+    Psi = est_sigma2*Amat @ Q_mat_part_inv @ Amat.T/_paras.norminal_sigma2
     Psi_inv = torch.linalg.pinv(Psi, hermitian=True, rtol=_paras.svdinv_eps_Psi)
     
     T_p1 = Amat @ est_theta[keep_idxs_test]

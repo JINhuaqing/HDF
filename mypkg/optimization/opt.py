@@ -6,6 +6,7 @@ import torch
 from optimization.one_step_opt import OneStepOpt
 from models.linear_model import LinearModel
 from utils.matrix import  col_vec2mat_fn
+import pdb
 
 
 def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_paras={}):

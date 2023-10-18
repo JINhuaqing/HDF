@@ -5,6 +5,7 @@ from utils.matrix import col_vec_fn, col_vec2mat_fn, gen_Dmat, svd_inverse, conj
 from projection import euclidean_proj_l1ball
 from models.linear_model import LinearModel
 import time
+import pdb
 
 def theta_proj(thetal, q, N, R):
     """Proj theta to the space \|theta_1\|_1 + \sum_j \|theta_2j\|_2 < R
