@@ -4,7 +4,6 @@ from rpy2 import robjects as robj
 
 _r = robj.r
 _r["library"]("splines")
-_r["library"]("orthogonalsplinebasis");
 _r_bs = _r['bs']
 
 def obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept=1):
@@ -55,6 +54,7 @@ def obt_bsp_obasis_Rfn(x, N, bsp_ord):
             bsp_ord: the order of b-spline; degree = order-1
             
     """
+    _r["library"]("orthogonalsplinebasis");
     knots = np.linspace(0, 1, N-(bsp_ord-2))
     eknots = _r["expand.knots"](robj.FloatVector(knots), order=bsp_ord);
     
