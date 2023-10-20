@@ -100,7 +100,7 @@ def CV_err_linear_fn(data, num_cv_fold, is_prg=False, save_paras=False, input_pa
             alp_init = torch.zeros(_paras.q)
             Gam_init = torch.zeros(_paras.N, d_SIS)
             theta_init = torch.cat([alp_init, col_vec_fn(Gam_init)/np.sqrt(_paras.N)])
-            rhok_init = torch.zeros(d_SIS*_paras.N) + 1
+            rhok_init = torch.zeros(d_SIS*_paras.N) 
         else:
             alp_init = torch.Tensor(_paras.alp_GT) + torch.randn(_paras.q)*_paras.init_noise_sd
             Gam_init = torch.Tensor(_paras.Gam_GT_est[:, keep_idxs]) + torch.randn(_paras.N, d_SIS)*_paras.init_noise_sd
