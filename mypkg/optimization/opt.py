@@ -26,6 +26,7 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
                                 if conjugate, None
                                 if cholesky_solve, L where the cholesky decom of left_mat=LL^T under linear, 
                                 if cholesky_inv, inverse of left_mat
+                is_BFGS: Whether using BFGS for updating theta or not, defualt is True
         
     """
     eps = 1e-10 # a small number to avoid divided-by-zero issue
@@ -34,12 +35,14 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
               'is_small': True,
               'alpha': 0.9,
               'beta': 1,
-              'NR_eps': 1e-05,
-              'NR_maxit': 100,
+              'N_eps': 1e-05,
+              'R_maxit': 100,
               'stop_cv': 0.0005,
               'max_iter': 2000, 
               "linear_theta_update": "cholesky_inv",
-              "linear_mat": None}
+              "linear_mat": None, 
+              "is_BFGS": True
+              }
     _paras = edict(_paras)
     _paras.update(input_paras)
     _paras.q = model.Z.shape[-1]
@@ -62,11 +65,12 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
                           beta=_paras.beta, 
                           model=model, 
                           penalty=penalty, 
-                          NR_eps=_paras.NR_eps, 
-                          NR_maxit=_paras.NR_maxit, 
+                          N_eps=_paras.N_eps, 
+                          N_maxit=_paras.N_maxit, 
                           R=_paras.Rv, 
                           linear_theta_update=_paras.linear_theta_update,
-                          linear_mat=_paras.linear_mat
+                          linear_mat=_paras.linear_mat, 
+                          is_BFGS=_paras.is_BFGS
                           )
             opt()
             Gam_init = opt.Gamk

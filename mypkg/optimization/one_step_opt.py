@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from easydict import EasyDict as edict
-from utils.matrix import col_vec_fn, col_vec2mat_fn, gen_Dmat, svd_inverse, conju_grad,  cholesky_inv
+from utils.matrix import col_vec_fn, col_vec2mat_fn, gen_Dmat, conju_grad,  cholesky_inv
 from projection import euclidean_proj_l1ball
 from models.linear_model import LinearModel
 import time
@@ -41,8 +41,8 @@ class OneStepOpt():
                             Note theta = [alp, Gam/sqrt(N)]
                 paras: other parameters
                     R: The radius of the projection space
-                    NR_eps: the stop criteria for Newton-Ralpson method
-                    NR_maxit: the max num of iterations for Newton-Ralpson method
+                    N_eps: the stop criteria for Newton-related method
+                    N_maxit: the max num of iterations for Newton-related method
                     linear_theta_update: 
                                 if conjugate, use conj_grad
                                 if cholesky_solve, use cholesky_solve
@@ -51,28 +51,27 @@ class OneStepOpt():
                                 if conjugate, None
                                 if cholesky_solve, L where the cholesky decom of left_mat=LL^T under linear, 
                                 if cholesky_inv, inverse of left_mat
+                    is_BFGS: Whether using BFGS for updating theta or not, defualt is True
         """
         self.paras = edict({
             "linear_theta_update": "cholesky_inv",
             "linear_mat": None,
+            "is_BFGS": True
                            })
         self.paras.update(paras)
         
         self.N, self.d = Gamk.shape
+        self.q = model.Z.shape[-1]
         assert len(rhok) == self.N * self.d
         if theta_init is None:
-            self.q = model.Z.shape[-1]
             theta_init = torch.randn(self.q+self.d*self.N)
-        else:
-            self.q = len(theta_init) - self.N*self.d
     
         self.model = model
         self.penalty = penalty
     
-        self.theta_init = theta_init
         self.Gamk = Gamk
         self.rhok = rhok
-        self.thetak = None
+        self.thetak = theta_init
         self.alpk = None
         
         self.D = gen_Dmat(self.d, self.N, self.q)
@@ -120,37 +119,138 @@ class OneStepOpt():
         self.thetak = theta_proj(thetak_raw, self.q, self.N, self.paras.R) # projection
     
     def _update_theta(self):
-        """First step of optimization, update theta 
+        """First step of optimization, update theta with Newton method
            This step can be slow
         """
-        thetal = self.theta_init
-        alpl = self.theta_init[:self.q]
-        Gaml = col_vec2mat_fn(self.theta_init[self.q:], nrow=self.N)*np.sqrt(self.N)
-        for ix in range(self.paras.NR_maxit):
-            der1_p1 = -self.model.log_lik_der1(alpl, Gaml)
+        def _obj_fn_der1(thetalk):
+            alplk = thetalk[:self.q]
+            Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
+            der1_p1 = -self.model.log_lik_der1(alplk, Gamlk)
             der1_p2 = -self.D.T @ self.rhok
-            der1_p3 = self.beta * (self.D.T@self.D@thetal - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
+            der1_p3 = self.beta * (self.D.T@self.D@thetalk - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
             der1 = der1_p1 + der1_p2 + der1_p3
-            
-            der2_p1 = -self.model.log_lik_der2(alpl, Gaml)
+            return der1
+        
+        def _obj_fn_der2(thetalk):
+            alplk = thetalk[:self.q]
+            Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
+            der2_p1 = -self.model.log_lik_der2(alplk, Gamlk)
             der2_p2 = self.beta * self.D.T @ self.D 
             der2 = der2_p1 + der2_p2 
+            return der2
+        thetal = self.thetak
+        alpl = thetal[:self.q]
+        Gaml = col_vec2mat_fn(thetal[self.q:], nrow=self.N)*np.sqrt(self.N)
+        for ix in range(self.paras.N_maxit):
+            der1 = _obj_fn_der1(thetal)
+            der2 = _obj_fn_der2(thetal)
             
             theta_last = thetal.clone()
-            der2_inv = svd_inverse(der2)
-            #der2_inv = torch.inverse(der2) # simply inverse will cause numerical problem
+            der2_inv = torch.linalg.pinv(der2, hermitian=True, rtol=1e-7)
             thetal = theta_last - der2_inv @ der1 # update 
-            thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
-            alpl = thetal[:self.q]
-            Gaml = col_vec2mat_fn(thetal[self.q:], nrow=self.N)*np.sqrt(self.N)
             
             stop_cv = torch.norm(thetal-theta_last)/torch.norm(thetal)
-            if stop_cv <= self.paras.NR_eps:
+            if stop_cv <= self.paras.N_eps:
                 break
-        if ix == (self.paras.NR_maxit-1):
+        if ix == (self.paras.N_maxit-1):
             print("The NR algorithm may not converge")
+        thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
         self.thetak = thetal
+        
+        
+    def _update_theta_BFGS(self):
+        """Update theta with BFGS, faster than Newtown
+        """
+        def _obj_fn(thetalk):
+            alplk = thetalk[:self.q]
+            Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
+            der0_p1 = -self.model.log_lik(alplk, Gamlk)
+            der0_p2 = -self.rhok @ (self.D @ thetalk - col_vec_fn(self.Gamk)/np.sqrt(self.N))
+            der0_p3 = self.beta * torch.norm(self.D @ thetalk - col_vec_fn(self.Gamk)/np.sqrt(self.N), p=2)**2/2
+            der0 = der0_p1 + der0_p2 + der0_p3
+            return der0
+        
+        def _obj_fn_der1(thetalk):
+            alplk = thetalk[:self.q]
+            Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
+            der1_p1 = -self.model.log_lik_der1(alplk, Gamlk)
+            der1_p2 = -self.D.T @ self.rhok
+            der1_p3 = self.beta * (self.D.T@self.D@thetalk - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
+            der1 = der1_p1 + der1_p2 + der1_p3
+            return der1
+        
+        def _obj_fn_der2(thetalk):
+            alplk = thetalk[:self.q]
+            Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
+            der2_p1 = -self.model.log_lik_der2(alplk, Gamlk)
+            der2_p2 = self.beta * self.D.T @ self.D 
+            der2 = der2_p1 + der2_p2 
+            return der2
+        
+        def _wolfe_cond_check(stepsizel, c1=1e-4, c2=0.9):
+            """c1, c2 from wiki pkg (Wolfe condition)
+            """
+            left1 = _obj_fn(thetal+stepsizel*dlt_thetal_raw)-_obj_fn(thetal)
+            right1 = c1*stepsizel*dlt_thetal_raw @ der1
             
+            left2 = - dlt_thetal_raw @ _obj_fn_der1(thetal+stepsizel*dlt_thetal_raw)
+            right2 = -c2* dlt_thetal_raw @ der1
+            return (left1 <= right1).float() +  (left2 <= right2).float()
+        
+        
+        # for BFGS, we show choose stepsize each step
+        # but I checked, fix stepsize=1 is a decent choice, so for speed, I fix it.
+        # if BFGS is not satisfactory, you may consider to make more candidate stepsizes (on Nov 14, 2023)
+        can_stepsizes = [1]
+        #can_stepsizes = torch.linspace(1e-4, 5, 10)
+        # initial
+        thetal = self.thetak
+        der1 = _obj_fn_der1(thetal)
+        Binvl = torch.eye(thetal.shape[0])
+        #Binvl = torch.linalg.pinv(_obj_fn_der2(thetal), hermitian=True, rtol=1e-7)
+        # get step size
+        stepsizel = 1
+        for ix in range(self.paras.N_maxit):
+            # get move step 
+            dlt_thetal = - stepsizel * Binvl @ der1
+            
+            # get new thetal
+            thetal = thetal + dlt_thetal
+            
+            # stop criterion 
+            stop_cv = torch.norm(dlt_thetal)/torch.norm(thetal)
+            if (stop_cv <= self.paras.N_eps) and (ix >=1):
+                break
+                
+            # save old der1
+            der1_last = der1.clone()
+            
+            # new der1
+            der1 = _obj_fn_der1(thetal)
+            
+            # yl
+            yl = der1 - der1_last
+            
+            # get new Binvl
+            Binvl_p1 = torch.eye(thetal.shape[0]) - torch.outer(dlt_thetal, yl)/(torch.inner(dlt_thetal, yl))
+            Binvl_p2 = torch.outer(dlt_thetal, dlt_thetal)/(torch.inner(dlt_thetal, yl))
+            Binvl = Binvl_p1 @ Binvl @ Binvl_p1.T + Binvl_p2
+            
+            # get step size
+            if len(can_stepsizes) > 1:
+                dlt_thetal_raw = -Binvl @ der1
+                obj_fns = [_obj_fn(thetal+can_stepsize*dlt_thetal_raw).item() for can_stepsize in can_stepsizes]
+                stepsizel = can_stepsizes[np.argmin(obj_fns)]
+            else:
+                stepsizel = can_stepsizes[0]
+            
+            if False:
+                _wolfe_cond_check(stepsizel)
+        
+        if ix == (self.paras.N_maxit-1):
+            print("The BGFS algorithm may not converge")
+        thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
+        self.thetak = thetal
     
     def _update_rho(self):
         """Second/Fourth step, update rho to get rho_k+1/2/rho_k"""
@@ -165,17 +265,14 @@ class OneStepOpt():
         self.Gamk = GamNk * np.sqrt(self.N)
     
     def __call__(self):
-        t0 = time.time()
         if isinstance(self.model, LinearModel):
             self._update_theta_linearmodel()
         else:
-            self._update_theta()
-        t1 = time.time()
+            if self.paras.is_BFGS:
+                self._update_theta_BFGS()
+            else:
+                self._update_theta()
         self._update_rho()
-        t2 = time.time()
         self._update_Gam()
-        t3 = time.time()
         self._update_rho()
-        t4 = time.time()
         self.alpk = self.thetak[:self.q]
-        #print(np.diff([t0, t1, t2, t3, t4]))

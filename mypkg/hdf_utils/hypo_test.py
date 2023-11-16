@@ -175,6 +175,7 @@ def obt_test_stat_simple2(Q_mat_part, Sig_mat_part, est_alp, est_Gam, Cmat, para
     Q_mat_part_inv = torch.linalg.pinv(Q_mat_part, hermitian=True, rtol=_paras.svdinv_eps_Q)
     Psi = Amat @ Q_mat_part_inv @ Sig_mat_part @ Q_mat_part_inv @ Amat.T
     Psi_inv = torch.linalg.pinv(Psi, hermitian=True, rtol=_paras.svdinv_eps_Psi)
+    #pdb.set_trace()
     
     T_p1 = Amat @ est_theta[keep_idxs_test]
     T_v = T_p1 @ Psi_inv @ T_p1 * _paras.n 
@@ -183,6 +184,7 @@ def obt_test_stat_simple2(Q_mat_part, Sig_mat_part, est_alp, est_Gam, Cmat, para
 def obt_test_stat_simple3(est_sigma2, Q_mat_part, est_alp, est_Gam, Cmat, paras):
     """
     Obtain the test statistics via the estimator, even simpler than simple2
+    Note that it is only valid for linear
 
     Args:
         est_sigma2: estimation of variance of error

@@ -9,6 +9,7 @@ dist_org = load_pkl(DATA_ROOT/"sc_distmat/dist68_org.pkl", verbose=False)
  # remove the small one
 sc_org[sc_org<sc_org.max()*0.05] = 0
 
+
 def get_sc(target_n_node):
     sc_new = zoom(sc_org, target_n_node/68, order=0)
     return sc_new

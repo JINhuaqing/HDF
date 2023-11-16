@@ -3,8 +3,6 @@ import numpy as np
 from rpy2 import robjects as robj
 
 _r = robj.r
-_r["library"]("splines")
-_r_bs = _r['bs']
 
 def obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept=1):
     """
@@ -17,6 +15,8 @@ def obt_bsp_basis_Rfn(x, iknots, bknots, bsp_ord, intercept=1):
             intercept: whether including intercept or not, i.e., the first col of the basis
                        it means the intercept of the polynomial.
     """
+    _r["library"]("splines")
+    _r_bs = _r['bs']
     iknots_rvec = robj.FloatVector(iknots)
     bknots_rvec = robj.FloatVector(bknots)
     x_rvec = robj.FloatVector(x)

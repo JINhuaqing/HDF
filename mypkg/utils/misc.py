@@ -2,6 +2,23 @@ import numpy as np
 import pickle
 from easydict import EasyDict as edict
 
+def bcross_entropy_loss(probs, y):
+    """
+    Calculates the binary cross-entropy loss between predicted probabilities and true labels.
+
+    Args:
+        probs (numpy.ndarray): Predicted probabilities.
+        y (numpy.ndarray): True labels.
+
+    Returns:
+        float: Binary cross-entropy loss.
+    """
+    assert np.bitwise_or(y ==1, y==0).sum() == len(y), "True labels should be either 1 or 0!"
+    eps = 1e-8
+    probs[probs==0] = eps
+    probs[probs==1] = 1-eps
+    return -np.mean(np.log(probs)*y + np.log(1-probs)*(1-y))
+
 def get_local_min_idxs(x):
     """ This fn is to get the local minimals. 
         args:
