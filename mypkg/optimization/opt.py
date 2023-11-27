@@ -97,6 +97,9 @@ def optimization(model, penalty, inits, is_prg=False, save_paras=False, input_pa
                              Gam_theta_diff_norm.item()])
             if stop_v < _paras.stop_cv:
                 break
+            if np.isnan(stop_v):
+                print(f"The optimization encounters nan")
+                break
                 
             if is_prg:
                 if ix % 10 == 0:

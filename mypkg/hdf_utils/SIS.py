@@ -3,7 +3,57 @@ import numpy as np
 from easydict import EasyDict as edict
 import torch
 from rpy2 import robjects as robj
+from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
 import pdb
+
+def SIS_GLIM(Y, X, Z, basis_mat, keep_ratio=0.3, model_type="logi", SIS_pen=1, input_paras={}):
+    """
+    The function is to do the sure ind screening when d (num of ROIs) is large under GLIM.
+    Ref to FanAoS2010.
+
+    Parameters:
+    - (Y, X, Z): The input data including X, Y, Z.
+    - basis_mat: The basis matrix, num of sps x N
+    - keep_ratio: The ratio of selected indices to keep.
+    - model_type: The type of model to use (linear or logistic).
+    - SIS_pen: The penalty parameter for SIS.
+    - input_paras: Additional input parameters.
+
+    Returns:
+    - sel_idx: The selected indices.
+    - norm_vs: A vector of beta norm
+
+    """
+    _paras = edict(input_paras.copy())
+    num_kp = int(np.round(len(_paras.sel_idx)*keep_ratio, 0))
+    N = basis_mat.shape[1]
+    if model_type.lower().startswith("lin"):
+        if SIS_pen == 0:
+            clf = LinearRegression(fit_intercept=False)
+        else:
+            clf = Ridge(fit_intercept=False, alpha=SIS_pen)
+    elif model_type.lower().startswith("log"):
+        clf = LogisticRegression(penalty="l2", fit_intercept=False, random_state=0, C=1/SIS_pen, solver="lbfgs")
+        
+        
+    tbets = []
+    for roi_ix in _paras.sel_idx:
+        Xl = X[:, roi_ix];
+        Sl = (Xl.unsqueeze(-1) * basis_mat.unsqueeze(0)).mean(axis=1); # num of sbj x N
+        # std Sl, but no need to std Z as the inputed Z is always stded. (on Nov 21, 2023)
+        Sl = (Sl - Sl.mean(axis=0, keepdims=True))/(Sl.std(axis=0, keepdims=True))
+        cur_X = torch.cat([Z.clone(), Sl], axis=1);
+        clf = clf.fit(cur_X.numpy(), Y.numpy())
+        if model_type.lower().startswith("lin"):
+            tgam = clf.coef_[Z.shape[1]:]
+        elif model_type.lower().startswith("log"):
+            tgam = clf.coef_[0][Z.shape[1]:]
+        tbet = basis_mat.numpy() @ tgam;
+        tbets.append(tbet)
+    tbets = np.array(tbets);
+    norm_vs = np.sqrt(np.mean(tbets**2, axis=1));
+    keep_idxs = np.sort(np.argsort(-norm_vs)[:num_kp])
+    return _paras.sel_idx[keep_idxs], norm_vs
 
 def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
     """The function is to do the sure ind screening when d (num of ROIs) is large under linear model

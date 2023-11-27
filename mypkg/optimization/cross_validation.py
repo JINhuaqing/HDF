@@ -7,7 +7,7 @@ from models.linear_model import LinearModel
 from hdf_utils.likelihood import obt_lin_tm
 from optimization.opt import optimization
 from penalties.scad_pen import SCAD
-from hdf_utils.SIS import SIS_linear, SIS_ballcor
+from hdf_utils.SIS import SIS_linear, SIS_GLIM
 from utils.matrix import col_vec_fn
 from utils.functions import logit_fn
 import torch
@@ -36,6 +36,8 @@ def CV_err_logi_fn(data, num_cv_fold, is_prg=False, save_paras=False, input_para
         'max_iter': 2000, 
         'cv_is_center': False,
         'cv_SIS_ratio': 0.2, 
+        'cv_SIS_pen': 1, 
+        'cv_SIS_basis_mat': None, 
         'cv_init_noise_sd': -1,
         "is_BFGS": True
     }
@@ -79,7 +81,12 @@ def CV_err_logi_fn(data, num_cv_fold, is_prg=False, save_paras=False, input_para
             
         # SIS step
         if _paras.cv_SIS_ratio < 1:
-            keep_idxs, _ = SIS_ballcor(train_set_Y, train_set_X, _paras.sel_idx, _paras.cv_SIS_ratio)
+            keep_idxs, _  = SIS_GLIM(Y=train_set_Y, X=train_set_X, Z=train_set_Z,
+                                     basis_mat=_paras.cv_SIS_basis_mat,
+                                     keep_ratio=_paras.cv_SIS_ratio,
+                                     model_type="logi", 
+                                     SIS_pen=_paras.cv_SIS_pen, 
+                                     input_paras=_paras)
         else:
             keep_idxs = _paras.sel_idx
         M_idxs = np.delete(np.arange(_paras.d), _paras.sel_idx)
@@ -118,6 +125,9 @@ def CV_err_logi_fn(data, num_cv_fold, is_prg=False, save_paras=False, input_para
         alp_est = res[0].alpk
         gam_est = res[0].Gamk
         test_Y_est = obt_lin_tm(test_set_Z, test_set_X, alp_est, gam_est, _paras.basis_mat)
+        mask = torch.zeros_like(gam_est)
+        mask[:, 0] = 1
+        #test_Y_est = obt_lin_tm(test_set_Z, test_set_X, alp_est, gam_est*mask, _paras.basis_mat)
         test_Y_prob_all.append(logit_fn(test_Y_est.numpy()))
     test_Y_prob_all = np.concatenate(test_Y_prob_all)
     if save_paras:
