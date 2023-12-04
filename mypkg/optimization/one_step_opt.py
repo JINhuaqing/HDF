@@ -51,7 +51,8 @@ class OneStepOpt():
                                 if conjugate, None
                                 if cholesky_solve, L where the cholesky decom of left_mat=LL^T under linear, 
                                 if cholesky_inv, inverse of left_mat
-                    is_BFGS: Whether using BFGS for updating theta or not, defualt is True
+                    is_BFGS: Whether using BFGS for updating theta or not, defualt is True. 
+                             If "adaptive": try BFGS first; if not convergence, use Newton method.
         """
         self.paras = edict({
             "linear_theta_update": "cholesky_inv",
@@ -77,6 +78,11 @@ class OneStepOpt():
         self.D = gen_Dmat(self.d, self.N, self.q)
         self.beta = beta
         self.alpha = alpha
+        
+        if isinstance(self.paras.is_BFGS, str):
+            assert self.paras.is_BFGS.lower().startswith("ada")
+        if  self.paras.is_BFGS:
+            self.BFGS_success = True
         
         if isinstance(self.model, LinearModel):
             self.linear_theta_update = self.paras.linear_theta_update.lower()
@@ -138,7 +144,7 @@ class OneStepOpt():
             der2_p2 = self.beta * self.D.T @ self.D 
             der2 = der2_p1 + der2_p2 
             return der2
-        thetal = self.thetak
+        thetal = self.thetak.clone()
         alpl = thetal[:self.q]
         Gaml = col_vec2mat_fn(thetal[self.q:], nrow=self.N)*np.sqrt(self.N)
         for ix in range(self.paras.N_maxit):
@@ -188,7 +194,7 @@ class OneStepOpt():
             return der2
         
         def _wolfe_cond_check(stepsizel, c1=1e-4, c2=0.9):
-            """c1, c2 from wiki pkg (Wolfe condition)
+            """c1, c2 from wiki pg (Wolfe condition)
             """
             left1 = _obj_fn(thetal+stepsizel*dlt_thetal_raw)-_obj_fn(thetal)
             right1 = c1*stepsizel*dlt_thetal_raw @ der1
@@ -204,7 +210,7 @@ class OneStepOpt():
         can_stepsizes = [1]
         #can_stepsizes = torch.linspace(1e-4, 5, 10)
         # initial
-        thetal = self.thetak
+        thetal = self.thetak.clone()
         der1 = _obj_fn_der1(thetal)
         Binvl = torch.eye(thetal.shape[0])
         #Binvl = torch.linalg.pinv(_obj_fn_der2(thetal), hermitian=True, rtol=1e-7)
@@ -248,9 +254,12 @@ class OneStepOpt():
                 _wolfe_cond_check(stepsizel)
         
         if ix == (self.paras.N_maxit-1):
-            print("The BGFS algorithm may not converge")
-        thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
-        self.thetak = thetal
+            print("The BFGS algorithm may not converge")
+            self.BFGS_success = False
+        if (not isinstance(self.paras.is_BFGS, str)) or self.BFGS_success:
+            thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
+            self.thetak = thetal
+                
     
     def _update_rho(self):
         """Second/Fourth step, update rho to get rho_k+1/2/rho_k"""
@@ -268,7 +277,11 @@ class OneStepOpt():
         if isinstance(self.model, LinearModel):
             self._update_theta_linearmodel()
         else:
-            if self.paras.is_BFGS:
+            if isinstance(self.paras.is_BFGS, str): 
+                self._update_theta_BFGS() 
+                if not self.BFGS_success:
+                    self._update_theta()
+            elif self.paras.is_BFGS:
                 self._update_theta_BFGS()
             else:
                 self._update_theta()

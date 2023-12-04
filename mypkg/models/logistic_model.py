@@ -22,7 +22,11 @@ class LogisticModel(BaseModel):
         tm2 = self.lin_tm_der #n x (q+dxN)
         #n x (q+dxN)
         
-        tm1 = self.Y - torch.exp(Os)/(1+torch.exp(Os)) # n
+        exp_Os = torch.exp(Os);
+        logits = exp_Os/(1+exp_Os) # n
+        # remove nan due to the inf value
+        logits[torch.isinf(exp_Os)] = 1.0
+        tm1 = self.Y - logits # n
         
         log_lik_der1_vs = tm1.unsqueeze(-1) * tm2 #n x (q+dxN)
         self.log_lik_der1_vs = log_lik_der1_vs
@@ -34,7 +38,10 @@ class LogisticModel(BaseModel):
         """
         Os = self._obt_lin_tm(alp, Gam) # linear term
         
-        tm1 = - torch.exp(Os)/((1+torch.exp(Os))**2) #n
+        exp_Os = torch.exp(Os);
+        tm1 = - exp_Os/((1+exp_Os)**2) #n
+        # remove nan due to the inf value
+        tm1[torch.isinf(exp_Os)] = -0.0
 
         if self.lin_tm_der is None:
             self._linear_term_der()

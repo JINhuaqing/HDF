@@ -8,3 +8,4 @@ mid_results/
 **/logs/
 figs/*
 tmp.*
+*.swp
