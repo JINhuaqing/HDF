@@ -173,7 +173,7 @@ def CV_err_linear_fn(data, num_cv_fold, is_prg=False, save_paras=False, input_pa
     _paras.n = data.Y.shape[0]
     
     #We center continous variable
-    con_idxs = [typ == 'c' for typ in paras.types_]
+    con_idxs = [typ == 'c' for typ in _paras.types_]
     
     
     num_test = int(_paras.n/num_cv_fold)
