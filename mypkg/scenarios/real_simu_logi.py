@@ -36,8 +36,11 @@ settingn1 = edict(deepcopy(base_params))
 add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
-add_params.data_gen_params.beta_fn = _get_gt_beta
 add_params.data_gen_params.cs_fn = lambda c: [c, 0, 0]
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
 
 add_params.setting = "n1"
 add_params.sel_idx =  np.arange(1, add_params.data_gen_params.d)
@@ -51,8 +54,11 @@ settingn1a = edict(deepcopy(base_params))
 add_params = edict({})
 add_params.data_gen_params = edict(base_params.data_gen_params.copy())
 add_params.data_gen_params.n = 500 # num of data obs to be genareted
-add_params.data_gen_params.beta_fn = _get_gt_beta
 add_params.data_gen_params.cs_fn = lambda c: [c, 0, 0]
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
 
 add_params.setting = "n1a"
 add_params.sel_idx =  np.arange(1, add_params.data_gen_params.d)
@@ -67,7 +73,10 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c+0.5, 0.5, 0]
-add_params.data_gen_params.beta_fn = _get_gt_beta
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
 
 add_params.setting = "n2"
 add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
@@ -82,7 +91,10 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 500 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c+0.5, 0.5, 0]
-add_params.data_gen_params.beta_fn = _get_gt_beta
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
 
 add_params.setting = "n2a"
 add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
@@ -97,7 +109,10 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
-add_params.data_gen_params.beta_fn = _get_gt_beta
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
 
 add_params.setting = "n3"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
@@ -113,7 +128,10 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 500 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
-add_params.data_gen_params.beta_fn = _get_gt_beta
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
 
 add_params.setting = "n3a"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)

@@ -51,13 +51,18 @@ settingn1.update(add_params)
 
 ## -------
 
+settingn1a = edict(deepcopy(settingn1))
+settingn1a.setting = "n1a"
+settingn1a.data_gen_params.n = 500
+
+## -------
+
 settingn1b = edict(deepcopy(base_params))
 add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, 0, 0]
-add_params.data_gen_params.data_params = edict(base_params.data_gen_params.data_params.copy())
-add_params.data_gen_params.data_params["err_dist"] = "t1"
+add_params.data_gen_params.data_params["err_dist"] = "t"
 add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
                                                              add_params.data_gen_params.d, 
                                                              add_params.data_gen_params.npts, 
@@ -70,9 +75,110 @@ add_params.can_Ns = [4, 6, 8, 10, 12, 14]
 add_params.SIS_ratio = 0.2
 settingn1b.update(add_params)
 
+## -------
+
+settingn2 = edict(deepcopy(base_params))
+add_params = edict({})
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
+add_params.data_gen_params.n = 200 # num of data obs to be genareted
+add_params.data_gen_params.cs_fn = lambda c: [c+0.5, 0.5, 0]
+add_params.data_gen_params.data_params["err_dist"] = "normal"
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
+
+add_params.setting = "n2"
+add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
+add_params.can_lams = [0.001, 0.1, 0.5, 0.6, 0.7, 0.8, 0.85, 0.9, 0.95, 1, 1.1, 1.2, 2, 8] 
+add_params.can_Ns = [4, 6, 8, 10, 12, 14]
+add_params.SIS_ratio = 0.2
+settingn2.update(add_params)
+
+## -------
+
+settingn2a = edict(deepcopy(settingn2))
+settingn2a.setting = "n2a"
+settingn2a.data_gen_params.n = 500
+
+## -------
+
+settingn2b = edict(deepcopy(base_params))
+add_params = edict({})
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
+add_params.data_gen_params.n = 200 # num of data obs to be genareted
+add_params.data_gen_params.cs_fn = lambda c: [c+0.5, 0.5, 0]
+add_params.data_gen_params.data_params["err_dist"] = "t"
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
+
+add_params.setting = "n2b"
+add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
+add_params.can_lams = [0.001, 0.1, 0.6, 0.7, 0.8,  0.9, 0.95, 1, 1.05, 1.1, 1.2, 2, 8]
+add_params.can_Ns = [4, 6, 8, 10, 12, 14]
+add_params.SIS_ratio = 0.2
+settingn2b.update(add_params)
+
+
+## -------
+
+settingn3 = edict(deepcopy(base_params))
+add_params = edict({})
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
+add_params.data_gen_params.n = 200 # num of data obs to be genareted
+add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
+add_params.data_gen_params.data_params["err_dist"] = "normal"
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
+
+add_params.setting = "n3"
+add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
+add_params.can_lams = [0.001, 0.1, 0.4, 0.5, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 1, 2, 8]
+add_params.can_Ns = [4, 6, 8, 10, 12, 14]
+add_params.SIS_ratio = 0.2
+settingn3.update(add_params)
+
+## -------
+
+settingn3a = edict(deepcopy(settingn3))
+settingn3a.setting = "n3a"
+settingn3a.data_gen_params.n = 500
+
+## -------
+
+settingn3b = edict(deepcopy(base_params))
+add_params = edict({})
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
+add_params.data_gen_params.n = 200 # num of data obs to be genareted
+add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
+add_params.data_gen_params.data_params["err_dist"] = "t"
+add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs, 
+                                                             add_params.data_gen_params.d, 
+                                                             add_params.data_gen_params.npts, 
+                                                             fct=2)
+
+add_params.setting = "n3b"
+add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
+add_params.can_lams = [0.001, 0.1, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 1, 2, 8]
+add_params.can_Ns = [4, 6, 8, 10, 12, 14]
+add_params.SIS_ratio = 0.2
+settingn3b.update(add_params)
 
 #-------
 
 settings = edict()
 settings.n1 = settingn1
+settings.n1a = settingn1a
 settings.n1b = settingn1b
+
+settings.n2 = settingn2
+settings.n2a = settingn2a
+settings.n2b = settingn2b
+
+settings.n3 = settingn3
+settings.n3a = settingn3a
+settings.n3b = settingn3b
