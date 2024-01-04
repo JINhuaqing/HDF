@@ -6,7 +6,7 @@ from rpy2 import robjects as robj
 from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
 import pdb
 
-def SIS_GLIM(Y, X, Z, basis_mat, keep_ratio=0.3, model_type="logi", SIS_pen=1, input_paras={}):
+def SIS_GLIM(Y, X, Z, basis_mat, sel_idx, keep_ratio=0.3, model_type="logi", SIS_pen=1):
     """
     The function is to do the sure ind screening when d (num of ROIs) is large under GLIM.
     Ref to FanAoS2010.
@@ -14,18 +14,17 @@ def SIS_GLIM(Y, X, Z, basis_mat, keep_ratio=0.3, model_type="logi", SIS_pen=1, i
     Parameters:
     - (Y, X, Z): The input data including X, Y, Z.
     - basis_mat: The basis matrix, num of sps x N
+    - sel_idx: the set of index to be selected from
     - keep_ratio: The ratio of selected indices to keep.
     - model_type: The type of model to use (linear or logistic).
     - SIS_pen: The penalty parameter for SIS.
-    - input_paras: Additional input parameters.
 
     Returns:
     - sel_idx: The selected indices.
     - norm_vs: A vector of beta norm
 
     """
-    _paras = edict(input_paras.copy())
-    num_kp = int(np.round(len(_paras.sel_idx)*keep_ratio, 0))
+    num_kp = int(np.round(len(sel_idx)*keep_ratio, 0))
     N = basis_mat.shape[1]
     if model_type.lower().startswith("lin"):
         if SIS_pen == 0:
@@ -37,7 +36,7 @@ def SIS_GLIM(Y, X, Z, basis_mat, keep_ratio=0.3, model_type="logi", SIS_pen=1, i
         
         
     tbets = []
-    for roi_ix in _paras.sel_idx:
+    for roi_ix in sel_idx:
         Xl = X[:, roi_ix];
         Sl = (Xl.unsqueeze(-1) * basis_mat.unsqueeze(0)).mean(axis=1); # num of sbj x N
         # std Sl, but no need to std Z as the inputed Z is always stded. (on Nov 21, 2023)
@@ -53,7 +52,7 @@ def SIS_GLIM(Y, X, Z, basis_mat, keep_ratio=0.3, model_type="logi", SIS_pen=1, i
     tbets = np.array(tbets);
     norm_vs = np.sqrt(np.mean(tbets**2, axis=1));
     keep_idxs = np.sort(np.argsort(-norm_vs)[:num_kp])
-    return _paras.sel_idx[keep_idxs], norm_vs
+    return sel_idx[keep_idxs], norm_vs
 
 def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
     """The function is to do the sure ind screening when d (num of ROIs) is large under linear model

@@ -3,11 +3,25 @@ import numpy as np
 from numbers import Number
 from pathlib import Path
 from utils.misc import load_pkl
+from utils.functions import logit_fn
 from tqdm import trange
-from constants import DATA_ROOT
+from constants import DATA_ROOT, MIDRES_ROOT
 from joblib import Parallel, delayed
 from hdf_utils.data_gen_utils import get_dist, get_sc_my
+from utils.misc import save_pkl, load_pkl
+from easydict import EasyDict as edict
 from hdf_utils.sgm import SGM
+from utils.misc import  _set_verbose_level, _update_params
+import torch
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+if not logger.hasHandlers():
+    ch = logging.StreamHandler() # for console. 
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch) 
 
 #AD_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/AD88_all.pkl")
 #Ctrl_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/Ctrl92_all.pkl")
@@ -144,5 +158,153 @@ def gen_covs(n, types_, std_con=True):
         covs.append(cur_cov)
     covs = np.array(covs).T
     return covs
+
+
+
+def _is_exists(tmp_paras):
+    """
+    Check if a file with the given parameters exists.
+
+    Args:
+    tmp_paras:
+        d (int): The value of d in the file name.
+        n (int): The value of n in the file name.
+        npts:
+        is_std
+        seed (int): The seed value in the file name.
+
+    Returns:
+    bool or Path: Returns the file path if the file exists, otherwise returns False.
+    """
+    _get_n = lambda fil: int(fil.stem.split("_")[2].split("-")[-1])
+    fils = MIDRES_ROOT.glob(f"PSD_d-{tmp_paras.d}_n-*npts-{tmp_paras.npts}_is_std-{tmp_paras.is_std}")
+    # We do not need fil with n as we know the data with corresponding seed does not exist
+    fils = [fil for fil in fils if _get_n(fil) !=tmp_paras.n]
+    if len(fils) == 0:
+        return False
+    else:
+        fils = sorted(fils, key=_get_n)
+        ns = np.array([_get_n(fil) for fil in fils])
+        idxs = np.where(tmp_paras.n <= ns)[0]
+        if len(idxs) == 0:
+            return False
+        else:
+            fil =fils[idxs[0]]
+            path = MIDRES_ROOT/fil/f"seed_{tmp_paras.seed}.pkl"
+            return path if path.exists() else False
+def _get_filename(params):
+    keys = ["d", "n", "npts", "is_std"]
+    folder_name = 'PSD_'+'_'.join(f"{k}-{params[k]}" for k in keys)
+    return folder_name + f'/seed_{params.seed}.pkl'
+
+
+def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs, 
+                 data_type="linear", data_params={}, 
+                 seed=0, is_std=False, verbose=2, is_gen=False):
+    """
+    Generate simulated data for all parameters.
+
+    Args:
+        seed (int): Seed for random number generator.
+        n (int): Number of samples.
+        d (int): Number of dimensions.
+        q (int): Number of covariates.
+        types_ (list): List of types for generating covariates.
+        gt_alp (list): List of ground truth alpha values.
+        gt_beta (list): List of ground truth beta values.
+        freqs (list): List of frequencies for generating simulated PSD.
+        is_std (bool): Whether std psd or not, if not, center it 
+        data_params (dict): Dict of other data params
+            - sigma2 (float): Variance of the noise for linear model
+            - err_dist (str): Distribution of the noise for linear model, norm or t
+            - psd_noise_sd (float): the level of noise added to PSD
+        verbose(bool): 0-3
+        is_gen(bool): Only for generating or not. If True, only checking or generating X, not return anything.
+
+    Returns:
+        all_data (dict): Dictionary containing the following simulated data:
+            - X (torch.Tensor): Tensor of shape (n, d, npts) containing the simulated PSD.
+            - Y (torch.Tensor): Tensor of shape (n,) containing the response variable.
+            - Z (torch.Tensor): Tensor of shape (n, q) containing the covariates.
+    """
+    np.random.seed(seed)
+    _set_verbose_level(verbose, logger)
+    data_type = data_type.lower()
+    if data_type.startswith("linear"):
+        data_params_def = {
+            "sigma2": 1, 
+            "err_dist": "norm", 
+            "psd_noise_sd": 1 if is_std else 10,
+        }
+    elif data_type.startswith("logi"):
+        data_params_def = {
+            "psd_noise_sd": 1 if is_std else 10,
+        }
+    else:
+        raise ValueError(f"{data_type} is not supported now.")
+    data_params = _update_params(data_params, data_params_def, logger)
+    
+    # simulated PSD
+    assert len(types_) == q
+    assert len(gt_alp) == q
+    tmp_paras = edict()
+    tmp_paras.seed = seed 
+    tmp_paras.n = n
+    tmp_paras.d = d
+    tmp_paras.npts = len(freqs)
+    tmp_paras.is_std = is_std
+    con_idxs = [typ =="c" for typ in types_]
+    
+    file_path = MIDRES_ROOT/_get_filename(tmp_paras)
+    if file_path.exists():
+        if is_gen:
+            return None
+        simu_curvs = load_pkl(file_path, verbose=verbose>=2)
+    else:
+        ofil =  _is_exists(tmp_paras)
+        if ofil:
+            if is_gen:
+                return None
+            simu_curvs = load_pkl(ofil, verbose=verbose>=2)
+        else:
+            simu_curvs = gen_simu_psd(n, d, freqs, prior_sd=10, n_jobs=28, is_prog=verbose>=2, is_std=is_std)
+            if not is_std:
+                simu_curvs = simu_curvs - simu_curvs.mean(axis=-1, keepdims=True); # not std, but center it
+            save_pkl(file_path, simu_curvs, verbose=verbose>=2)
+    if is_gen:
+        return None
+    simu_curvs = simu_curvs[:n]
+    simu_curvs = (simu_curvs + np.random.randn(*simu_curvs.shape)*data_params.psd_noise_sd)*1 # larger
+    simu_covs = gen_covs(n, types_)
+    
+    # linear term and Y
+    int_part = np.sum(gt_beta.T* simu_curvs[:, :, :], axis=1).mean(axis=1)
+    cov_part = simu_covs @ gt_alp 
+    
+    # linear term
+    lin_term = cov_part + int_part
+    
+    # Y 
+    if data_type.startswith("linear"):
+        if data_params["err_dist"].lower().startswith("t"):
+            errs_raw = np.random.standard_t(df=3, size=n)
+            errs = np.sqrt(data_params["sigma2"])*(errs_raw - errs_raw.mean())/errs_raw.std()
+        elif data_params["err_dist"].lower().startswith("norm"):
+            errs = np.random.randn(n)*np.sqrt(data_params["sigma2"])
+        Y = lin_term + errs
+    elif data_type.startswith("logi"):
+        probs = logit_fn(lin_term)
+        Y = np.random.binomial(1, probs, size=len(probs))
+    
+    # To torch
+    X = torch.Tensor(simu_curvs) # n x d x npts
+    Z = torch.Tensor(simu_covs) # n x q
+    Y = torch.Tensor(Y)
+    
+    all_data = edict()
+    all_data.X = X
+    all_data.Y = Y
+    all_data.Z = Z
+    return all_data
 
 

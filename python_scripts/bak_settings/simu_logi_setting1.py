@@ -198,22 +198,6 @@ if not paras.save_dir.exists():
     paras.save_dir.mkdir()
 
 
-# In[ ]:
-
-
-
-
-
-# ## Fns
-
-# In[ ]:
-
-
-
-
-
-# In[7]:
-
 
 def _is_exists(tmp_paras):
     """

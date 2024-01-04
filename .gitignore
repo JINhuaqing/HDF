@@ -9,3 +9,4 @@ mid_results/
 figs/*
 tmp.*
 *.swp
+backup/

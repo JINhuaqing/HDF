@@ -4,8 +4,19 @@ from easydict import EasyDict as edict
 from utils.matrix import col_vec_fn, col_vec2mat_fn, gen_Dmat, conju_grad,  cholesky_inv
 from projection import euclidean_proj_l1ball
 from models.linear_model import LinearModel
-import time
+from models.logistic_model import LogisticModel
+from utils.misc import  _set_verbose_level, _update_params
+from pprint import pprint
 import pdb
+import logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+if not logger.hasHandlers():
+    ch = logging.StreamHandler() # for console. 
+    ch.setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch) 
 
 def theta_proj(thetal, q, N, R):
     """Proj theta to the space \|theta_1\|_1 + \sum_j \|theta_2j\|_2 < R
@@ -27,19 +38,19 @@ def theta_proj(thetal, q, N, R):
 
 class OneStepOpt():
     """One step for the optimization"""
-    def __init__(self, Gamk, rhok, alpha, beta, 
-                 model, penalty, 
-                 theta_init=None, **paras):
+    def __init__(self, Gamk, rhok, model, penalty,  
+                 theta_init=None, verbose=0,  **other_paras):
         """args:
                 Gamk: The Gam from last update, matrix of N x d
                 rhok: The vector rho from last update, vector of dN
-                alpha : the parameter for CPRSM, scalar, alpha and alp are different, alpha \in (0, 1)
-                beta: the parameter for CPRSM, scalar, beta>0
                 model: likelihood model: LogisticModel or LinearModel
                 penalty: The penalty fn, SCAD or (to be written)
                 theta_init: The initial value of theta, vec of q+dN
                             Note theta = [alp, Gam/sqrt(N)]
-                paras: other parameters
+                verbose: log level, from 0 to 3, increase the output
+                other_paras: other parameters
+                    alpha : the parameter for CPRSM, scalar, alpha and alp are different, alpha \in (0, 1)
+                    beta: the parameter for CPRSM, scalar, beta>0
                     R: The radius of the projection space
                     N_eps: the stop criteria for Newton-related method
                     N_maxit: the max num of iterations for Newton-related method
@@ -54,40 +65,61 @@ class OneStepOpt():
                     is_BFGS: Whether using BFGS for updating theta or not, defualt is True. 
                              If "adaptive": try BFGS first; if not convergence, use Newton method.
         """
-        self.paras = edict({
-            "linear_theta_update": "cholesky_inv",
-            "linear_mat": None,
-            "is_BFGS": True
-                           })
-        self.paras.update(paras)
+        _set_verbose_level(verbose, logger)
+            
+        
+        if isinstance(model, LinearModel):
+            paras = edict({
+                'alpha': 0.9,
+                'beta': 1,
+                "R": 1e5,
+                "linear_theta_update": "cholesky_inv",
+                "linear_mat": None,
+            })
+        elif isinstance(model, LogisticModel):
+            paras = edict({
+                'alpha': 0.9,
+                'beta': 1,
+                "R": 1e5,
+                "is_BFGS": "adaptive",
+                "N_eps": 1e-4, 
+                "N_maxit": 100,
+            })
+            
+        paras = _update_params(other_paras, paras, logger)
+        
         
         self.N, self.d = Gamk.shape
         self.q = model.Z.shape[-1]
         assert len(rhok) == self.N * self.d
+        
         if theta_init is None:
-            theta_init = torch.randn(self.q+self.d*self.N)
+            theta_init = torch.zeros(self.q+self.d*self.N)
     
         self.model = model
         self.penalty = penalty
-    
         self.Gamk = Gamk
         self.rhok = rhok
-        self.thetak = theta_init
+        self.thetak = theta_init # in fact, we do not need this for linear model
         self.alpk = None
-        
+        self.paras = paras
         self.D = gen_Dmat(self.d, self.N, self.q)
-        self.beta = beta
-        self.alpha = alpha
         
-        if isinstance(self.paras.is_BFGS, str):
-            assert self.paras.is_BFGS.lower().startswith("ada")
-        if  self.paras.is_BFGS:
-            self.BFGS_success = True
         
-        if isinstance(self.model, LinearModel):
-            self.linear_theta_update = self.paras.linear_theta_update.lower()
+        if isinstance(model, LinearModel):
+            #logger.warning(f"It is linear model, so is_BFGS, N_eps, N_maxit are ignored.")
+            self.linear_theta_update = paras.linear_theta_update.lower()
             assert self.linear_theta_update in ["conjugate", "cholesky_solve", "cholesky_inv"]
-            self.linear_mat = self.paras.linear_mat
+            self.linear_mat = paras.linear_mat
+        elif isinstance(model, LogisticModel):
+            #logger.warning(f"It is logistic model, so linear_theta_update, linear_mat are ignored.")
+            if isinstance(paras.is_BFGS, str):
+                assert paras.is_BFGS.lower().startswith("ada")
+            if  paras.is_BFGS:
+                self.BFGS_success = True
+            
+        logger.debug(f"The paras is {paras}.")
+        
     
     def _update_theta_linearmodel(self):
         """First step of optimization, update theta under linear model.
@@ -97,25 +129,25 @@ class OneStepOpt():
             self.model._linear_term_der()
             
         right_vec = (self.D.T@self.rhok +
-                     self.beta*self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N) + 
+                     self.paras.beta*self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N) + 
                      (self.model.Y.unsqueeze(-1)*self.model.lin_tm_der).mean(dim=0)/self.model.sigma2)
         if self.linear_theta_update.startswith("cholesky_inv"):
             if self.linear_mat is None:
                 tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
-                left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
+                left_mat = tmp_mat/self.model.sigma2 + self.paras.beta * self.D.T@self.D
                 self.linear_mat = cholesky_inv(left_mat)
             thetak_raw = self.linear_mat @ right_vec;
                 
         elif self.linear_theta_update.startswith("conjugate"):
             tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
-            left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
+            left_mat = tmp_mat/self.model.sigma2 + self.paras.beta * self.D.T@self.D
             
             thetak_raw = conju_grad(left_mat, right_vec)
             
         elif self.linear_theta_update.startswith("cholesky_solve"):
             if self.linear_mat is None:
                 tmp_mat = self.model.lin_tm_der.T@self.model.lin_tm_der/len(self.model.Y) # (q+dN) x (q+dN)
-                left_mat = tmp_mat/self.model.sigma2 + self.beta * self.D.T@self.D
+                left_mat = tmp_mat/self.model.sigma2 + self.paras.beta * self.D.T@self.D
                 self.linear_mat = torch.linalg.cholesky(left_mat)
             thetak_raw = torch.cholesky_solve(right_vec.reshape(-1, 1), self.linear_mat).reshape(-1);
         else:
@@ -133,7 +165,7 @@ class OneStepOpt():
             Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
             der1_p1 = -self.model.log_lik_der1(alplk, Gamlk)
             der1_p2 = -self.D.T @ self.rhok
-            der1_p3 = self.beta * (self.D.T@self.D@thetalk - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
+            der1_p3 = self.paras.beta * (self.D.T@self.D@thetalk - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
             der1 = der1_p1 + der1_p2 + der1_p3
             return der1
         
@@ -141,7 +173,7 @@ class OneStepOpt():
             alplk = thetalk[:self.q]
             Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
             der2_p1 = -self.model.log_lik_der2(alplk, Gamlk)
-            der2_p2 = self.beta * self.D.T @ self.D 
+            der2_p2 = self.paras.beta * self.D.T @ self.D 
             der2 = der2_p1 + der2_p2 
             return der2
         thetal = self.thetak.clone()
@@ -159,7 +191,7 @@ class OneStepOpt():
             if stop_cv <= self.paras.N_eps:
                 break
         if ix == (self.paras.N_maxit-1):
-            print("The NR algorithm may not converge")
+            logger.warning("The NR algorithm may not converge")
         thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
         self.thetak = thetal
         
@@ -172,7 +204,7 @@ class OneStepOpt():
             Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
             der0_p1 = -self.model.log_lik(alplk, Gamlk)
             der0_p2 = -self.rhok @ (self.D @ thetalk - col_vec_fn(self.Gamk)/np.sqrt(self.N))
-            der0_p3 = self.beta * torch.norm(self.D @ thetalk - col_vec_fn(self.Gamk)/np.sqrt(self.N), p=2)**2/2
+            der0_p3 = self.paras.beta * torch.norm(self.D @ thetalk - col_vec_fn(self.Gamk)/np.sqrt(self.N), p=2)**2/2
             der0 = der0_p1 + der0_p2 + der0_p3
             return der0
         
@@ -181,7 +213,7 @@ class OneStepOpt():
             Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
             der1_p1 = -self.model.log_lik_der1(alplk, Gamlk)
             der1_p2 = -self.D.T @ self.rhok
-            der1_p3 = self.beta * (self.D.T@self.D@thetalk - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
+            der1_p3 = self.paras.beta * (self.D.T@self.D@thetalk - self.D.T@col_vec_fn(self.Gamk)/np.sqrt(self.N))
             der1 = der1_p1 + der1_p2 + der1_p3
             return der1
         
@@ -189,7 +221,7 @@ class OneStepOpt():
             alplk = thetalk[:self.q]
             Gamlk = col_vec2mat_fn(thetalk[self.q:], nrow=self.N)*np.sqrt(self.N)
             der2_p1 = -self.model.log_lik_der2(alplk, Gamlk)
-            der2_p2 = self.beta * self.D.T @ self.D 
+            der2_p2 = self.paras.beta * self.D.T @ self.D 
             der2 = der2_p1 + der2_p2 
             return der2
         
@@ -254,7 +286,10 @@ class OneStepOpt():
                 _wolfe_cond_check(stepsizel)
         
         if ix == (self.paras.N_maxit-1):
-            print("The BFGS algorithm may not converge")
+            if not isinstance(self.paras.is_BFGS, str):
+                logger.warning("The BFGS algorithm may not converge.")
+            else:
+                logger.info("The BFGS algorithm may not converge.")
             self.BFGS_success = False
         if (not isinstance(self.paras.is_BFGS, str)) or self.BFGS_success:
             thetal = theta_proj(thetal, self.q, self.N, self.paras.R) # projection
@@ -264,13 +299,13 @@ class OneStepOpt():
     def _update_rho(self):
         """Second/Fourth step, update rho to get rho_k+1/2/rho_k"""
         assert self.thetak is not None
-        self.rhok = self.rhok - self.alpha*self.beta*(self.D@self.thetak-col_vec_fn(self.Gamk)/np.sqrt(self.N))
+        self.rhok = self.rhok - self.paras.alpha*self.paras.beta*(self.D@self.thetak-col_vec_fn(self.Gamk)/np.sqrt(self.N))
         
     
     def _update_Gam(self):
         """Third step, update Gam to get Gam_k+1"""
-        GamNk_raw = col_vec2mat_fn(self.D@self.thetak - self.rhok/self.beta, nrow=self.N)
-        GamNk = self.penalty(GamNk_raw, C=self.beta)
+        GamNk_raw = col_vec2mat_fn(self.D@self.thetak - self.rhok/self.paras.beta, nrow=self.N)
+        GamNk = self.penalty(GamNk_raw, C=self.paras.beta)
         self.Gamk = GamNk * np.sqrt(self.N)
     
     def __call__(self):
@@ -280,6 +315,7 @@ class OneStepOpt():
             if isinstance(self.paras.is_BFGS, str): 
                 self._update_theta_BFGS() 
                 if not self.BFGS_success:
+                    logger.info("As BFGS algorithm may not converge, we use Newton method.")
                     self._update_theta()
             elif self.paras.is_BFGS:
                 self._update_theta_BFGS()
