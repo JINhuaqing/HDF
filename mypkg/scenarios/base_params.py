@@ -1,5 +1,6 @@
 import numpy as np
 from easydict import EasyDict as edict
+from copy import deepcopy
 
 
 _base_params = edict()
@@ -15,7 +16,7 @@ _base_params.hypo_params = edict({})
 
 
 def get_base_params(model_type):
-    cur_base_params = edict(_base_params.copy())
+    cur_base_params = deepcopy(_base_params)
     cur_base_params.model_type = model_type
 
     

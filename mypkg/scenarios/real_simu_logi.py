@@ -2,6 +2,7 @@ import numpy as np
 from easydict import EasyDict as edict
 from hdf_utils.fns_sinica import coef_fn, fourier_basis_fn
 from .base_params import get_base_params
+from copy import deepcopy
 from constants import RES_ROOT
 
 base_params = get_base_params("logi") 
@@ -31,9 +32,9 @@ def _get_gt_beta(cs, d, npts, fct=2):
 
 
 ##---settings------------------------------
-settingn1 = edict(base_params.copy())
+settingn1 = edict(deepcopy(base_params))
 add_params = edict({})
-add_params.data_gen_params = edict(base_params.data_gen_params)
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
 add_params.data_gen_params.beta_fn = _get_gt_beta
 add_params.data_gen_params.cs_fn = lambda c: [c, 0, 0]
@@ -46,9 +47,9 @@ settingn1.update(add_params)
 
 #----------------------------------
 
-settingn1a = edict(base_params.copy())
+settingn1a = edict(deepcopy(base_params))
 add_params = edict({})
-add_params.data_gen_params = edict(base_params.data_gen_params)
+add_params.data_gen_params = edict(base_params.data_gen_params.copy())
 add_params.data_gen_params.n = 500 # num of data obs to be genareted
 add_params.data_gen_params.beta_fn = _get_gt_beta
 add_params.data_gen_params.cs_fn = lambda c: [c, 0, 0]
@@ -61,9 +62,9 @@ settingn1a.update(add_params)
 
 #----------------------------------
 
-settingn2 = edict(base_params.copy())
+settingn2 = edict(deepcopy(base_params))
 add_params = edict({})
-add_params.data_gen_params = edict(base_params.data_gen_params)
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c+0.5, 0.5, 0]
 add_params.data_gen_params.beta_fn = _get_gt_beta
@@ -76,9 +77,9 @@ settingn2.update(add_params)
 
 #----------------------------------
 
-settingn2a = edict(base_params.copy())
+settingn2a = edict(deepcopy(base_params))
 add_params = edict({})
-add_params.data_gen_params = edict(base_params.data_gen_params)
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 500 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c+0.5, 0.5, 0]
 add_params.data_gen_params.beta_fn = _get_gt_beta
@@ -91,9 +92,9 @@ settingn2a.update(add_params)
 
 #----------------------------------
 
-settingn3 = edict(base_params.copy())
+settingn3 = edict(deepcopy(base_params))
 add_params = edict({})
-add_params.data_gen_params = edict(base_params.data_gen_params)
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 200 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
 add_params.data_gen_params.beta_fn = _get_gt_beta
@@ -107,9 +108,9 @@ settingn3.update(add_params)
 
 #----------------------------------
 
-settingn3a = edict(base_params.copy())
+settingn3a = edict(deepcopy(base_params))
 add_params = edict({})
-add_params.data_gen_params = edict(base_params.data_gen_params)
+add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 500 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
 add_params.data_gen_params.beta_fn = _get_gt_beta
