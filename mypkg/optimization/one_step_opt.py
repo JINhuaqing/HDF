@@ -107,12 +107,10 @@ class OneStepOpt():
         
         
         if isinstance(model, LinearModel):
-            #logger.warning(f"It is linear model, so is_BFGS, N_eps, N_maxit are ignored.")
             self.linear_theta_update = paras.linear_theta_update.lower()
             assert self.linear_theta_update in ["conjugate", "cholesky_solve", "cholesky_inv"]
             self.linear_mat = paras.linear_mat
         elif isinstance(model, LogisticModel):
-            #logger.warning(f"It is logistic model, so linear_theta_update, linear_mat are ignored.")
             if isinstance(paras.is_BFGS, str):
                 assert paras.is_BFGS.lower().startswith("ada")
             if  paras.is_BFGS:

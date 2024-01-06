@@ -93,7 +93,6 @@ class HDFOpt():
                'beta': 1,
                'R': 2e5,
                "linear_theta_update": "cholesky_inv",
-               "linear_mat": None, 
              }
         elif model_type.startswith("logi"):
             model_params_def = {}
@@ -273,12 +272,13 @@ class HDFOpt():
             prg_bar = trange(opt_params.max_iter, desc="Main Loop")
         else:
             prg_bar = range(opt_params.max_iter)
+        one_step_params = edict(opt_params.copy())
+        one_step_params.pop("stop_cv")
+        one_step_params.pop("max_iter")
+        one_step_params.pop("one_step_verbose")
+        one_step_params["verbose"] = opt_params.one_step_verbose
+        one_step_params["linear_mat"] = None
         for ix in prg_bar:
-            one_step_params = edict(opt_params.copy())
-            one_step_params.pop("stop_cv")
-            one_step_params.pop("max_iter")
-            one_step_params.pop("one_step_verbose")
-            one_step_params["verbose"] = opt_params.one_step_verbose
             opt = OneStepOpt(Gamk=Gam_init, 
                              rhok=rhok_init, 
                              model=model, 
@@ -327,7 +327,7 @@ class HDFOpt():
             last_rhok = opt.rhok
             last_thetak = opt.thetak
             if isinstance(model, LinearModel):
-                opt_params.linear_mat = opt.linear_mat
+                one_step_params.linear_mat = opt.linear_mat
             
         if ix == (opt_params.max_iter-1):
             logger.warning(f"The optimization may not converge with stop value {stop_v:.3E}")
@@ -386,9 +386,9 @@ class HDFOpt():
                     train_set_Y = train_set_Y - train_set_Y.mean(axis=0, keepdims=True)
             cv_res, cur_keep_idxs = self._fit(self.pen_params.lam, self.bsp_params.N, train_set_X, train_set_Y, train_set_Z, 
                                               is_pbar=False, is_cv=True)
-            alp_est = cv_res.alpk
-            gam_est = cv_res.Gamk
-            test_Y_est = obt_lin_tm(test_set_Z, test_set_X[:, cur_keep_idxs], alp_est, gam_est, self.basis_mat)
+            est_alp = cv_res.alpk
+            est_Gam = cv_res.Gamk
+            test_Y_est = obt_lin_tm(test_set_Z, test_set_X[:, cur_keep_idxs], est_alp, est_Gam, self.basis_mat)
             if self.model_type.startswith("linear"):
                 test_Y_est_all.append(test_Y_est.numpy())
             elif self.model_type.startswith("logi"):
