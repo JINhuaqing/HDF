@@ -43,12 +43,12 @@ torch.set_default_dtype(torch.double)
 
 
 np.random.seed(0)
-c = args.c
+c = args.cs
 
 setting = settings[args.setting]
 data_gen_params = setting.data_gen_params
 data_gen_params.cs = data_gen_params.cs_fn(c)
-data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs, data_gen_params.d, data_gen_params.npts)
+data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
 
 num_rep = 200
 n_jobs = 30
@@ -66,7 +66,7 @@ def _get_logi_int(data_gen_params, n_jobs=30, num_rep=100):
     ress = []
     for inte in tqdm(data_gen_params.intercept_cans):
         gt_alp = np.concatenate([[inte], data_gen_params.gt_alp0])
-        def _run_fn(seed, data_gen_params=data_gen_params):
+        def _tmp_fn(seed, data_gen_params=data_gen_params):
             data = gen_simu_psd_dataset(n=data_gen_params.n, 
                                         d=data_gen_params.d, 
                                         q=data_gen_params.q, 
@@ -82,7 +82,7 @@ def _get_logi_int(data_gen_params, n_jobs=30, num_rep=100):
                                         is_gen=False);
             return data.Y.numpy()
         with Parallel(n_jobs=n_jobs) as parallel:
-            res = parallel(delayed(_run_fn)(seed) for seed in range(num_rep))
+            res = parallel(delayed(_tmp_fn)(seed) for seed in range(num_rep))
         ress.append(np.array(res))
 
 
@@ -100,10 +100,11 @@ def _get_logi_int(data_gen_params, n_jobs=30, num_rep=100):
 data_gen_params.gt_alp = _get_logi_int(data_gen_params, n_jobs=n_jobs);
 
 pprint(setting)
+print(f"Save at {save_dir}")
 
 # # Simu
 
-def _run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
+def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     """Now (on Aug 25, 2023), if we keep seed the same, the cur_data is the same. 
        If you want to make any changes, make sure this. 
     """
@@ -160,7 +161,7 @@ def _run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     else:
         hdf_fit = load_pkl(save_dir/f_name, verbose>=2);
         
-    return hdf_fit
+    return None
 
 
 # In[ ]:
@@ -170,7 +171,7 @@ def _run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
 
 all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
 with Parallel(n_jobs=n_jobs) as parallel:
-    ress = parallel(delayed(_run_fn)(seed, lam=lam, N=N, setting=setting, is_save=True, is_cv=True, verbose=1) 
+    ress = parallel(delayed(_main_run_fn)(seed, lam=lam, N=N, setting=setting, is_save=True, is_cv=True, verbose=1) 
                     for seed, lam, N 
                     in tqdm(all_coms, total=len(setting.can_Ns)*len(setting.can_lams)*num_rep))
 # In[ ]:
@@ -182,7 +183,7 @@ with Parallel(n_jobs=n_jobs) as parallel:
 
 def _get_valset_metric_fn(res):
     valsel_metrics = edict()
-    valsel_metrics.entroy_loss = bcross_entropy_loss(res.cv_Y_est, res.Y.numpy());
+    valsel_metrics.entropy_loss = bcross_entropy_loss(res.cv_Y_est, res.Y.numpy());
     valsel_metrics.mse_loss = np.mean((res.cv_Y_est- res.Y.numpy())**2);
     valsel_metrics.mae_loss = np.mean(np.abs(res.cv_Y_est-res.Y.numpy()));
     valsel_metrics.cv_probs = res.cv_Y_est
@@ -195,6 +196,6 @@ def _run_fn_extract(seed, N, lam, c):
 
 all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
 with Parallel(n_jobs=n_jobs) as parallel:
-    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, cur_N, cur_lam, c=c)  for cur_seed, cur_lam, cur_N in tqdm(all_coms, total=num_rep*len(can_Ns)*len(can_lams), desc=f"c: {c}"))
+    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, cur_N, cur_lam, c=c)  for cur_seed, cur_lam, cur_N in tqdm(all_coms, total=num_rep*len(setting.can_Ns)*len(setting.can_lams), desc=f"c: {c}"))
 all_cv_errs = {res[0]:res[1] for res in all_cv_errs_list};
 save_pkl(save_dir/f"all-valsel-metrics.pkl", all_cv_errs, is_force=1)

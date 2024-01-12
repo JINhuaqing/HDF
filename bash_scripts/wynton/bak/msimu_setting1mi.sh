@@ -8,11 +8,11 @@
 ##### set job working directory
 #$ -wd  /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/
 #### Specify job name
-#$ -N gen_psd3f
+#$ -N mS1mi_040
 #### Output file
-#$ -o wynton/logs/$JOB_NAME_$JOB_ID.out
+#$ -o wynton/logs/matlab_$JOB_NAME_$JOB_ID.out
 #### Error file
-#$ -e wynton/logs/$JOB_NAME_$JOB_ID.err
+#$ -e wynton/logs/matlab_$JOB_NAME_$JOB_ID.err
 #### memory per core
 #$ -l mem_free=2G
 #### number of cores 
@@ -28,8 +28,13 @@
 #### The GPU memory required, in MiB
 ### #$ -l gpu_mem=12000M
 
-echo "Starting running"
 
-singularity exec ~/MyResearch/hdf_snsfix.sif python -u ../python_scripts/gen_psd_data.py --start 750
+echo "RUNNING"
 
+singularity exec ~/MyResearch/hdf_orthbasis.sif python -u ../python_scripts/gen_matlab_data_setting1mi.py --cs 0.40
+
+module load matlab
+matlab -batch "run('/wynton/home/rajlab/hjin/MyResearch/HDF/matlab_scripts/sinica_code/simu_setting1mi.m')"
+
+#### End-of-job summary, if running as a job
 [[ -n "$JOB_ID" ]] && qstat -j "$JOB_ID"

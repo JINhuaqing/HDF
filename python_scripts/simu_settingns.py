@@ -41,7 +41,7 @@ torch.set_default_dtype(torch.double)
 
 
 np.random.seed(0)
-c = args.c
+c = args.cs
 
 setting = settings[args.setting]
 data_gen_params = setting.data_gen_params
@@ -51,7 +51,7 @@ data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
 num_rep = 200
 n_jobs = 30
 #num_rep_CV = 200
-save_dir = RES_ROOT/f"simu_setting{setting.setting}"
+save_dir = RES_ROOT/f"simu_setting{setting.setting}_{c*1000:.0f}"
 if not save_dir.exists():
     save_dir.mkdir()
 
@@ -118,11 +118,11 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
         if is_cv:
             hdf_fit.get_cv_est(_setting.num_cv_fold)
         if is_save:
-            hdf_fit.save(save_dir/f_name, is_compact=False, is_force=True)
+            hdf_fit.save(save_dir/f_name, is_compact=True, is_force=True)
     else:
         hdf_fit = load_pkl(save_dir/f_name, verbose>=2);
         
-    return hdf_fit
+    return None
 
 
 # In[ ]:
@@ -142,7 +142,7 @@ def _get_valset_metric_fn(res):
     valsel_metrics = edict()
     valsel_metrics.mse_loss = np.mean((res.cv_Y_est- res.Y.numpy())**2);
     valsel_metrics.mae_loss = np.mean(np.abs(res.cv_Y_est-res.Y.numpy()));
-    valsel_metrics.cv_probs = res.cv_Y_est
+    valsel_metrics.cv_Y_est = res.cv_Y_est
     valsel_metrics.tY = res.Y.numpy()
     return valsel_metrics
 def _run_fn_extract(seed, N, lam, c):
@@ -152,6 +152,6 @@ def _run_fn_extract(seed, N, lam, c):
 
 all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
 with Parallel(n_jobs=n_jobs) as parallel:
-    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, cur_N, cur_lam, c=c)  for cur_seed, cur_lam, cur_N in tqdm(all_coms, total=num_rep*len(can_Ns)*len(can_lams), desc=f"c: {c}"))
+    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, cur_N, cur_lam, c=c)  for cur_seed, cur_lam, cur_N in tqdm(all_coms, total=num_rep*len(setting.can_Ns)*len(setting.can_lams), desc=f"c: {c}"))
 all_cv_errs = {res[0]:res[1] for res in all_cv_errs_list};
 save_pkl(save_dir/f"all-valsel-metrics.pkl", all_cv_errs, is_force=1)

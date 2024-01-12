@@ -98,7 +98,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "n2a"
 add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 1.0, 2.0, 4.0, 16.0]
+add_params.can_lams = [0.001, 0.01, 0.05, 0.08, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 1.0, 2.0, 4.0, 16.0]
 add_params.SIS_ratio = 0.2
 settingn2a.update(add_params)
 
@@ -116,7 +116,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "n3"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 0.3, 0.4, 0.45, 0.5, 0.6,  0.7, 0.8, 1.0, 2.0, 4.0, 16.0]
+add_params.can_lams = [0.001, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.45, 0.5, 0.6,  0.7, 0.8, 1.0, 2.0, 4.0, 16.0]
 add_params.SIS_ratio = 0.2
 settingn3.update(add_params)
 
@@ -135,7 +135,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "n3a"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 0.3, 0.4, 0.45, 0.5, 0.6,  0.7, 0.8, 1.0, 2.0, 4.0, 16.0]
+add_params.can_lams = [0.001, 0.01, 0.05, 0.08, 0.1, 0.3, 0.4, 0.45, 0.5, 0.6,  0.7, 0.8, 1.0, 2.0, 4.0, 16.0]
 add_params.SIS_ratio = 0.2
 settingn3a.update(add_params)
 
