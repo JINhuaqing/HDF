@@ -8,11 +8,11 @@
 ##### set job working directory
 #$ -wd  /wynton/home/rajlab/hjin/MyResearch/HDF/bash_scripts/
 #### Specify job name
-#$ -N Sn3
+#$ -N Sn_fixNlam
 #### Output file
-#$ -o wynton/logs/Logi-$JOB_NAME_$JOB_ID.out
+#$ -o wynton/logs/Linear-$JOB_NAME_$JOB_ID.out
 #### Error file
-#$ -e wynton/logs/Logi-$JOB_NAME_$JOB_ID.err
+#$ -e wynton/logs/Linear-$JOB_NAME_$JOB_ID.err
 #### memory per core
 #$ -l mem_free=2G
 #### number of cores 
@@ -29,10 +29,11 @@
 ### #$ -l gpu_mem=12000M
 
 echo "Starting running"
-setting=n3
 
-singularity exec ~/MyResearch/hdf_orthbasis.sif python -u ../python_scripts/simu_logi_settingns.py --cs 0.00 --setting $setting
-singularity exec ~/MyResearch/hdf_orthbasis.sif python -u ../python_scripts/simu_logi_settingns.py --cs 0.20 --setting $setting
-#singularity exec ~/MyResearch/hdf_orthbasis.sif python -u ../python_scripts/simu_logi_settingns.py --cs 0.40 --setting $setting
+for setting in n1 n1b n2 n2b n3 n3b; do
+    for cv in 0.00 0.20 0.40; do
+    singularity exec ~/MyResearch/hdf_orthbasis.sif python -u ../python_scripts/simu_settingns_fixNlam.py --cs $cv --setting $setting
+    done
+done
 
 [[ -n "$JOB_ID" ]] && qstat -j "$JOB_ID"
