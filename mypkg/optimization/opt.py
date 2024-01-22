@@ -446,11 +446,12 @@ class HDFOpt():
         A = part1 @ part2
         return A
         
-    def hypo_test(self, Cmat, is_simpler=False, hypo_params={}):
+    def hypo_test(self, Cmat, ts=None, is_simpler=False, hypo_params={}):
         """
         Conduct hypothesis test based on the fitting resutls
         args:
             Cmat(np.ndarray): r x m matrix for the hypotest problem
+            ts (np.ndarray): Hypotest is C Beta = ts, so ts is npts x r. Default to ts =0
             is_simpler(bool): only used for linear model, calculate the test stat in a simpler way to 
                               avoid too many matrix inverses.
             hypo_params(dict): other hypo parameters
@@ -468,8 +469,19 @@ class HDFOpt():
         })
         hypo_params = _update_params(hypo_params, hypo_params_def, logger)
         hypo_params["Cmat"] = Cmat
-        logger.info(f"opt parmas is {hypo_params}.")
+        logger.info(f"hypo parmas is {hypo_params}.")
         self.hypo_params = hypo_params
+
+        if ts is not None:
+            if ts.ndim == 1:
+                ts = ts[:, None]
+            p1 = self.basis_mat.T @ self.basis_mat/self.basis_mat.shape[0]
+            p2 = self.basis_mat.T @ ts/self.basis_mat.shape[0];
+            p = torch.linalg.pinv(p1, hermitian=True) @ p2;
+            vecp = p.T.flatten()/np.sqrt(self.bsp_params.N);
+        else:
+            vecp = 0
+             
         
         
         
@@ -494,7 +506,7 @@ class HDFOpt():
             Psi = Amat @ Q_mat_part_inv @ self.hypo_utils.Sig_mat_part @ Q_mat_part_inv @ Amat.T
         Psi_inv = torch.linalg.pinv(Psi, hermitian=True, rtol=hypo_params.svdinv_eps_Psi)
         
-        T_p1 = Amat @ est_theta[self.hypo_utils.keep_idxs_test]
+        T_p1 = Amat @ est_theta[self.hypo_utils.keep_idxs_test] - vecp
         T_v = T_p1 @ Psi_inv @ T_p1 * n 
         
         

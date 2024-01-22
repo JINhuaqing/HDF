@@ -42,9 +42,12 @@ torch.set_default_dtype(torch.double)
 # In[7]:
 
 opt_lamNs = {
-"n1": {"0.0": (6, 0.2), "0.2": (6, 0.2), "0.4": (6, 0.2)}, 
-"n2": {"0.0": (6, 0.3), "0.2": (6, 0.3), "0.4": (6, 0.3)}, 
+"n1": {"0.0": (6, 0.2), "0.1": (6, 0.2), "0.2": (6, 0.2), "0.4": (6, 0.2)}, 
+"n1a": {"0.0": (12, 0.2), "0.1": (12, 0.2), "0.2": (12, 0.2), "0.4": (12, 0.2)}, 
+"n2": {"0.0": (6, 0.3), "0.1": (6, 0.3), "0.2": (6, 0.3), "0.4": (6, 0.3)}, 
+"n2a": {"0.0": (6, 0.1), "0.1": (6, 0.1), "0.2": (6, 0.1), "0.4": (6, 0.1)}, 
 "n3": {"0.0": (6, 0.3), "0.2": (6, 0.3), "0.4": (4, 0.2)}, 
+"n3a": {"0.0": (6, 0.1), "0.2": (6, 0.1), "0.4": (6, 0.1)}, 
 }
 
 
@@ -177,7 +180,7 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
 
 
 with Parallel(n_jobs=n_jobs) as parallel:
-    ress = parallel(delayed(_main_run_fn)(seed, lam=opt_lamN[1], N=opt_lamN[0], setting=setting, is_save=True, is_cv=True, verbose=1) 
+    ress = parallel(delayed(_main_run_fn)(seed, lam=opt_lamN[1], N=opt_lamN[0], setting=setting, is_save=True, is_cv=False, verbose=1) 
                     for seed
                     in tqdm(range(num_rep0, num_rep1), total=(num_rep1-num_rep0)))
 # In[ ]:
@@ -185,24 +188,3 @@ with Parallel(n_jobs=n_jobs) as parallel:
 
 
 
-
-
-def _get_valset_metric_fn(res):
-    valsel_metrics = edict()
-    valsel_metrics.entropy_loss = bcross_entropy_loss(res.cv_Y_est, res.Y.numpy());
-    valsel_metrics.mse_loss = np.mean((res.cv_Y_est- res.Y.numpy())**2);
-    valsel_metrics.mae_loss = np.mean(np.abs(res.cv_Y_est-res.Y.numpy()));
-    valsel_metrics.cv_probs = res.cv_Y_est
-    valsel_metrics.tY = res.Y.numpy()
-    return valsel_metrics
-def _run_fn_extract(seed, N, lam, c):
-    f_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
-    res = load_pkl(save_dir/f_name, verbose=0)
-    return (seed, N, lam), _get_valset_metric_fn(res)
-
-with Parallel(n_jobs=n_jobs) as parallel:
-    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, opt_lamN[0], opt_lamN[1], c=c)  
-                    for cur_seed
-                    in tqdm(range(num_rep0, num_rep1), total=(num_rep1-num_rep0), desc=f"c:{c}"))
-all_cv_errs = {res[0]:res[1] for res in all_cv_errs_list};
-save_pkl(save_dir/f"all-valsel-metrics_more.pkl", all_cv_errs, is_force=1)

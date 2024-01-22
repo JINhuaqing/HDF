@@ -3,6 +3,42 @@ import pickle
 from easydict import EasyDict as edict
 import logging
 
+def trunc_mean(values, alpha=0.05):
+    """
+    Calculate the truncated mean of a given array of values.
+
+    Parameters:
+        values (array-like): The input array of values.
+        alpha (float, optional): The significance level used to determine the lower and upper limits for truncation. Default is 0.05.
+
+    Returns:
+        float: The truncated mean of the input values.
+
+    """
+    if alpha > 0:
+        lowlmt, uplmt = np.quantile(values, [alpha/2, 1-alpha/2])
+    else:
+        lowlmt, uplmt = -np.inf, np.inf
+    kpidx = np.bitwise_and(values>=lowlmt, values<=uplmt)
+    return np.mean(values[kpidx])
+def bcross_entropy_loss_truc(probs, y, alpha=0.05):
+    """
+    Calculates the binary cross-entropy loss between predicted probabilities and true labels.
+
+    Args:
+        probs (numpy.ndarray): Predicted probabilities.
+        y (numpy.ndarray): True labels.
+
+    Returns:
+        float: Binary cross-entropy loss.
+    """
+    assert np.bitwise_or(y ==1, y==0).sum() == len(y), "True labels should be either 1 or 0!"
+    eps = 1e-8
+    probs[probs==0] = eps
+    probs[probs==1] = 1-eps
+    scores = -(np.log(probs)*y + np.log(1-probs)*(1-y))
+    return trunc_mean(scores, alpha)
+
 def _set_verbose_level(verbose, logger):
     if verbose == 0:
         logger.handlers[0].setLevel(logging.ERROR)
@@ -22,7 +58,7 @@ def _update_params(input_params, def_params, logger):
                 def_params[ky] = v
     return edict(def_params)
 
-def bcross_entropy_loss(probs, y):
+def bcross_entropy_loss(probs, y, is_median=False):
     """
     Calculates the binary cross-entropy loss between predicted probabilities and true labels.
 
@@ -37,7 +73,10 @@ def bcross_entropy_loss(probs, y):
     eps = 1e-8
     probs[probs==0] = eps
     probs[probs==1] = 1-eps
-    return -np.mean(np.log(probs)*y + np.log(1-probs)*(1-y))
+    if is_median:
+        return -np.median(np.log(probs)*y + np.log(1-probs)*(1-y))
+    else:
+        return -np.mean(np.log(probs)*y + np.log(1-probs)*(1-y))
 
 def get_local_min_idxs(x):
     """ This fn is to get the local minimals. 

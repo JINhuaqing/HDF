@@ -5,7 +5,7 @@
 # 
 # It is under the linear setting
 # 
-# Now, I use the same beta from the paper but the PSD as X
+# Now, I use the same beta and X from the paper 
 
 # In[1]:
 
@@ -20,13 +20,13 @@ from easydict import EasyDict as edict
 from tqdm import tqdm
 from pprint import pprint
 from joblib import Parallel, delayed
-from scipy.stats import chi2
 
-from constants import RES_ROOT
-from hdf_utils.data_gen import gen_simu_psd_dataset
+from constants import RES_ROOT 
+from hdf_utils.data_gen import gen_simu_sinica_dataset
 from utils.misc import save_pkl, load_pkl
 from optimization.opt import HDFOpt
-from scenarios.real_simu_linear import settings
+from scenarios.real_simu_linear_sinica import settings
+from hdf_utils.fns_sinica import  fourier_basis_fn
 
 
 
@@ -40,6 +40,14 @@ torch.set_default_dtype(torch.double)
 
 
 
+
+
+
+# # Params
+
+# In[6]:
+
+
 np.random.seed(0)
 c = args.cs
 
@@ -47,22 +55,18 @@ setting = settings[args.setting]
 data_gen_params = setting.data_gen_params
 data_gen_params.cs = data_gen_params.cs_fn(c)
 data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
+x = np.linspace(0, 1, data_gen_params.npts)
+fourier_basis = fourier_basis_fn(x) 
 
 num_rep = 200
 n_jobs = 30
-#num_rep_CV = 200
+Cmat = np.eye(data_gen_params.d - len(setting.sel_idx))
 save_dir = RES_ROOT/f"simu_setting{setting.setting}_{c*1000:.0f}"
 if not save_dir.exists():
     save_dir.mkdir()
 
-
-# In[ ]:
-
 pprint(setting)
 print(f"Save to {save_dir}")
-
-
-
 
 
 def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
@@ -84,19 +88,18 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     
     
     if not (save_dir/f_name).exists():
-        cur_data = gen_simu_psd_dataset(n=data_gen_params.n, 
-                            d=data_gen_params.d, 
-                            q=data_gen_params.q, 
-                            types_=data_gen_params.types_, 
-                            gt_alp=data_gen_params.gt_alp, 
-                            gt_beta=data_gen_params.gt_beta, 
-                            freqs=data_gen_params.freqs, 
-                            data_type=data_gen_params.data_type, 
-                            data_params=data_gen_params.data_params, 
-                            seed=seed, 
-                            is_std=data_gen_params.is_std, 
-                            verbose=verbose, 
-                            is_gen=False);
+        cur_data = gen_simu_sinica_dataset(n=data_gen_params.n, 
+                                   d=data_gen_params.d, 
+                                   q=data_gen_params.q, 
+                                   types_=data_gen_params.types_, 
+                                   gt_alp=data_gen_params.gt_alp, 
+                                   gt_beta=data_gen_params.gt_beta, 
+                                   npts=data_gen_params.npts, 
+                                   fourier_basis=fourier_basis, 
+                                   data_type=data_gen_params.data_type,
+                                   data_params=data_gen_params.data_params, 
+                                   seed=seed, 
+                                   verbose=verbose);
         hdf_fit = HDFOpt(lam=_setting.lam, 
                          sel_idx=_setting.sel_idx, 
                          model_type=_setting.model_type,
@@ -132,7 +135,6 @@ with Parallel(n_jobs=n_jobs) as parallel:
     ress = parallel(delayed(_main_run_fn)(seed, lam=lam, N=N, setting=setting, is_save=True, is_cv=True, verbose=1) 
                     for seed, lam, N 
                     in tqdm(all_coms, total=len(setting.can_Ns)*len(setting.can_lams)*num_rep))
-
 
 
 def _get_valset_metric_fn(res):

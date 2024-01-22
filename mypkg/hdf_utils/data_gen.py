@@ -1,18 +1,19 @@
 # this file contains fns for generating data for simulation
+import torch
 import numpy as np
 from numbers import Number
 from pathlib import Path
-from utils.misc import load_pkl
-from utils.functions import logit_fn
 from tqdm import trange
-from constants import DATA_ROOT, MIDRES_ROOT
 from joblib import Parallel, delayed
-from hdf_utils.data_gen_utils import get_dist, get_sc_my
-from utils.misc import save_pkl, load_pkl
 from easydict import EasyDict as edict
-from hdf_utils.sgm import SGM
-from utils.misc import  _set_verbose_level, _update_params
-import torch
+
+from constants import DATA_ROOT, MIDRES_ROOT
+from utils.misc import  _set_verbose_level, _update_params, load_pkl, save_pkl
+from utils.functions import logit_fn
+from .data_gen_utils import get_dist, get_sc_my
+from .sgm import SGM
+from .fns_sinica import gen_sini_Xthetas
+
 import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -308,3 +309,88 @@ def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs,
     return all_data
 
 
+
+def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts, 
+                            fourier_basis, 
+                            data_type="linear",
+                            data_params={}, seed=0, verbose=2):
+    """
+    Generate simulated data for all parameters under sinica 
+
+    Args:
+        seed (int): Seed for random number generator.
+        n (int): Number of samples.
+        d (int): Number of dimensions.
+        q (int): Number of covariates.
+        types_ (list): List of types for generating covariates.
+        gt_alp (list): List of ground truth alpha values.
+        gt_beta (list): List of ground truth beta values.
+        npts (int): The number of points
+        fourier_basis(np.ndarray): The fourier basis used to generate X, npts x 50
+        data_params (dict): Dict of other data params
+            - sigma2 (float): Variance of the noise for linear model
+            - err_dist (str): Distribution of the noise for linear model, norm or t
+            - srho (float): The corr between Xs
+        verbose(bool): 0-3
+
+    Returns:
+        all_data (dict): Dictionary containing the following simulated data:
+            - X (torch.Tensor): Tensor of shape (n, d, npts) containing the simulated PSD.
+            - Y (torch.Tensor): Tensor of shape (n,) containing the response variable.
+            - Z (torch.Tensor): Tensor of shape (n, q) containing the covariates.
+    """
+
+    np.random.seed(seed)
+    _set_verbose_level(verbose, logger)
+    data_type = data_type.lower()
+    if data_type.startswith("linear"):
+        data_params_def = {
+            "sigma2": 1, 
+            "err_dist": "norm", 
+            "srho": 0.3,
+        }
+    elif data_type.startswith("logi"):
+        data_params_def = {
+            "srho": 0.3,
+        }
+    else:
+        raise ValueError(f"{data_type} is not supported now.")
+    data_params = _update_params(data_params, data_params_def, logger)
+    
+    # simulated PSD
+    assert len(types_) == q
+    assert len(gt_alp) == q
+   
+    thetas = gen_sini_Xthetas(data_params.srho, n, d);
+    simu_curvs = thetas @ fourier_basis.T; # n x d x npts
+    simu_covs = gen_covs(n, types_)
+    
+    # linear term and Y
+    int_part = np.sum(gt_beta.T* simu_curvs[:, :, :], axis=1).mean(axis=1)
+    cov_part = simu_covs @ gt_alp
+    
+    # linear term
+    lin_term = cov_part + int_part
+    
+    # Y 
+    if data_type.startswith("linear"):
+        if data_params["err_dist"].lower().startswith("t"):
+            errs_raw = np.random.standard_t(df=3, size=n)
+            errs = np.sqrt(data_params["sigma2"])*(errs_raw - errs_raw.mean())/errs_raw.std()
+        elif data_params["err_dist"].lower().startswith("norm"):
+            errs = np.random.randn(n)*np.sqrt(data_params["sigma2"])
+        Y = lin_term + errs
+    elif data_type.startswith("logi"):
+        probs = logit_fn(lin_term)
+        Y = np.random.binomial(1, probs, size=len(probs))
+    
+    # To torch
+    X = torch.Tensor(simu_curvs) # n x d x npts
+    Z = torch.Tensor(simu_covs) # n x q
+    Y = torch.Tensor(Y)
+    
+    all_data = edict()
+    all_data.X = X
+    all_data.Y = Y
+    all_data.Z = Z
+    return all_data
