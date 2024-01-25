@@ -362,7 +362,9 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts,
     assert len(gt_alp) == q
    
     thetas = gen_sini_Xthetas(data_params.srho, n, d);
-    simu_curvs = thetas @ fourier_basis.T; # n x d x npts
+    #simu_curvs = thetas[:, :, :fourier_basis.shape[1]] @ fourier_basis.T; # n x d x npts
+    #simu_curvs = thetas @ fourier_basis.T; # n x d x npts
+    #simu_curvs = np.random.randn(n, d, npts) * 5
     simu_covs = gen_covs(n, types_)
     
     # linear term and Y
@@ -394,3 +396,106 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts,
     all_data.Y = Y
     all_data.Z = Z
     return all_data
+
+def gen_simu_meg_dataset(n, q, types_, gt_alp, gt_beta, npts, 
+                            base_data, 
+                            data_type="linear",
+                            data_params={}, seed=0, verbose=2):
+    """
+    Generate simulated data for all parameters under meg data
+    d is 68
+
+    Args:
+        seed (int): Seed for random number generator.
+        n (int): Number of samples.
+        q (int): Number of covariates.
+        types_ (list): List of types for generating covariates.
+        gt_alp (list): List of ground truth alpha values.
+        gt_beta (list): List of ground truth beta values.
+        npts (int): The number of points
+        data_params (dict): Dict of other data params
+            - sigma2 (float): Variance of the noise for linear model
+            - err_dist (str): Distribution of the noise for linear model, norm or t
+        verbose(bool): 0-3
+
+    Returns:
+        all_data (dict): Dictionary containing the following simulated data:
+            - X (torch.Tensor): Tensor of shape (n, d, npts) containing the simulated PSD.
+            - Y (torch.Tensor): Tensor of shape (n,) containing the response variable.
+            - Z (torch.Tensor): Tensor of shape (n, q) containing the covariates.
+    """
+
+    np.random.seed(seed)
+    _set_verbose_level(verbose, logger)
+    data_type = data_type.lower()
+    if data_type.startswith("linear"):
+        data_params_def = {
+            "sigma2": 1, 
+            "err_dist": "norm", 
+        }
+    elif data_type.startswith("logi"):
+        data_params_def = {
+        }
+    else:
+        raise ValueError(f"{data_type} is not supported now.")
+    data_params = _update_params(data_params, data_params_def, logger)
+    
+    # simulated PSD
+    assert len(types_) == q
+    assert len(gt_alp) == q
+   
+    simu_curvs = get_meg_curvs(n, npts, base_data, move_step=20)
+    #simu_curvs = np.random.randn(n, d, npts) * 5
+    simu_covs = gen_covs(n, types_)
+    
+    # linear term and Y
+    int_part = np.sum(gt_beta.T* simu_curvs[:, :, :], axis=1).mean(axis=1)
+    cov_part = simu_covs @ gt_alp
+    
+    # linear term
+    lin_term = cov_part + int_part
+    
+    # Y 
+    if data_type.startswith("linear"):
+        if data_params["err_dist"].lower().startswith("t"):
+            errs_raw = np.random.standard_t(df=3, size=n)
+            errs = np.sqrt(data_params["sigma2"])*(errs_raw - errs_raw.mean())/errs_raw.std()
+        elif data_params["err_dist"].lower().startswith("norm"):
+            errs = np.random.randn(n)*np.sqrt(data_params["sigma2"])
+        Y = lin_term + errs
+    elif data_type.startswith("logi"):
+        probs = logit_fn(lin_term)
+        Y = np.random.binomial(1, probs, size=len(probs))
+    
+    # To torch
+    X = torch.Tensor(simu_curvs) # n x d x npts
+    Z = torch.Tensor(simu_covs) # n x q
+    Y = torch.Tensor(Y)
+    
+    all_data = edict()
+    all_data.X = X
+    all_data.Y = Y
+    all_data.Z = Z
+    return all_data
+
+def get_meg_curvs(n, npts, base_data, move_step=20):
+    """Get 68 x npts MEG based on basedata
+    args:
+        n: Num of data you want to get
+        npts: The length of the seq
+        base_data: The base data to generate MEG, num_sub x 68 x total_seq
+    return:
+        curvs: n x 68 x npts
+    """
+    num_subs, d, total_seq = base_data.shape
+    init_pts = np.arange(0, total_seq-npts, move_step)
+    sel_sub_idx = np.random.choice(num_subs, size=n);
+    sel_init_idx = np.random.choice(init_pts, size=n);
+    
+    curvs = []
+    for sub_ix, init_ix in zip(sel_sub_idx, sel_init_idx):
+        curv = base_data[sub_ix, :, init_ix:(init_ix+npts)]
+        curv = (curv - curv.mean(axis=1, keepdims=1))/curv.std(axis=1, keepdims=1) * 5
+        curvs.append(curv)
+    curvs = np.array(curvs);
+    return curvs

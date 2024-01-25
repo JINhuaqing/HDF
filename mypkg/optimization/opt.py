@@ -3,6 +3,7 @@ import numpy as np
 from tqdm import trange
 from easydict import EasyDict as edict
 import torch
+import pdb
 
 from .one_step_opt import OneStepOpt
 from models.linear_model import LinearModel
@@ -424,6 +425,7 @@ class HDFOpt():
         self.hypo_utils.Q_mat_part = Q_mat_part
         self.hypo_utils.Sig_mat_part = Sig_mat_part
         self.hypo_utils.keep_idxs_test = keep_idxs_test
+        # num of non zeros betas but not in M set
         self.hypo_utils.k = len(np.setdiff1d(nonzero_idxs, M_idxs))
         if self.model_type.startswith("linear"):
             est_sigma2 = torch.mean((self.opt_res.model.Y - self.opt_res.model._obt_lin_tm(est_alp, est_Gam))**2)
@@ -511,6 +513,7 @@ class HDFOpt():
         
         
         pval = chi2.sf(T_v, Cmat.shape[0]*self.bsp_params.N)
+        #print(T_v, Cmat.shape[0]*self.bsp_params.N)
         
         hypo_test_res = edict()
         hypo_test_res.pval = pval

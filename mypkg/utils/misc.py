@@ -41,13 +41,17 @@ def bcross_entropy_loss_truc(probs, y, alpha=0.05):
 
 def _set_verbose_level(verbose, logger):
     if verbose == 0:
-        logger.handlers[0].setLevel(logging.ERROR)
+        verbose_lv = logging.ERROR
     elif verbose == 1:
-        logger.handlers[0].setLevel(logging.WARNING)
+        verbose_lv = logging.WARNING
     elif verbose == 2:
-        logger.handlers[0].setLevel(logging.INFO)
+        verbose_lv = logging.INFO
     elif verbose == 3:
-        logger.handlers[0].setLevel(logging.DEBUG)
+        verbose_lv = logging.DEBUG
+    if len(logger.handlers)>0:
+        logger.handlers[0].setLevel(verbose_lv)
+    else:
+        logger.setLevel(verbose_lv)
 
 def _update_params(input_params, def_params, logger):
     for ky, v in input_params.items():
