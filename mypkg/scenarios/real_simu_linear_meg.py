@@ -45,7 +45,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "nm1"
 add_params.sel_idx =  np.arange(1, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 1, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
+add_params.can_lams = [0.001, 0.1, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 add_params.can_Ns = [4, 6, 8, 10, 12]
 add_params.SIS_ratio = 0.2
 settingnm1.update(add_params)
@@ -65,7 +65,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "nm1b"
 add_params.sel_idx =  np.arange(1, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 1, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
+add_params.can_lams = [0.001, 0.1, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 add_params.can_Ns = [4, 6, 8, 10, 12]
 add_params.SIS_ratio = 0.2
 settingnm1b.update(add_params)
@@ -86,7 +86,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "nm2"
 add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 1, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
+add_params.can_lams = [0.001, 0.1, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 add_params.can_Ns = [4, 6, 8, 10, 12]
 add_params.SIS_ratio = 0.2
 settingnm2.update(add_params)
@@ -107,7 +107,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "nm2b"
 add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 1, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
+add_params.can_lams = [0.001, 0.1, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 add_params.can_Ns = [4, 6, 8, 10, 12]
 add_params.SIS_ratio = 0.2
 settingnm2b.update(add_params)
@@ -127,7 +127,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
 
 add_params.setting = "nm3"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 1, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
+add_params.can_lams = [0.001, 0.1, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 add_params.can_Ns = [4, 6, 8, 10, 12]
 add_params.SIS_ratio = 0.2
 settingnm3.update(add_params)
@@ -146,7 +146,7 @@ add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
                                                              fct=2)
 add_params.setting = "nm3b"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)
-add_params.can_lams = [0.001, 0.1, 1, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
+add_params.can_lams = [0.001, 0.1, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 add_params.can_Ns = [4, 6, 8, 10, 12]
 add_params.SIS_ratio = 0.2
 settingnm3b.update(add_params)
