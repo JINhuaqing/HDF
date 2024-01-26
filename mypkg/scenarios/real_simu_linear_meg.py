@@ -174,16 +174,20 @@ settingnm3d.SIS_ratio = 1
 #### n = 500
 settingnm1a = edict(deepcopy(settingnm1))
 settingnm1a.setting = "nm1a"
+settingnm1a.can_lams = [0.001, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 settingnm1a.data_gen_params.n = 500
 settingnm1e = edict(deepcopy(settingnm1b))
+settingnm1e.can_lams = [0.001, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 settingnm1e.setting = "nm1e"
 settingnm1e.data_gen_params.n = 500
 
 settingnm2a = edict(deepcopy(settingnm2))
 settingnm2a.setting = "nm2a"
+settingnm2a.can_lams = [0.001, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 settingnm2a.data_gen_params.n = 500
 settingnm2e = edict(deepcopy(settingnm2b))
 settingnm2e.setting = "nm2e"
+settingnm2e.can_lams = [0.001, 0.1, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7,  2, 8]
 settingnm2e.data_gen_params.n = 500
 
 settingnm3a = edict(deepcopy(settingnm3))
