@@ -362,7 +362,7 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts,
     assert len(gt_alp) == q
    
     thetas = gen_sini_Xthetas(data_params.srho, n, d);
-    #simu_curvs = thetas[:, :, :fourier_basis.shape[1]] @ fourier_basis.T; # n x d x npts
+    simu_curvs = thetas[:, :, :fourier_basis.shape[1]] @ fourier_basis.T; # n x d x npts
     #simu_curvs = thetas @ fourier_basis.T; # n x d x npts
     #simu_curvs = np.random.randn(n, d, npts) * 5
     simu_covs = gen_covs(n, types_)
@@ -495,7 +495,7 @@ def get_meg_curvs(n, npts, base_data, move_step=20):
     curvs = []
     for sub_ix, init_ix in zip(sel_sub_idx, sel_init_idx):
         curv = base_data[sub_ix, :, init_ix:(init_ix+npts)]
-        curv = (curv - curv.mean(axis=1, keepdims=1))/curv.std(axis=1, keepdims=1) * 5
+        curv = (curv - curv.mean(axis=1, keepdims=1))/curv.std(axis=1, keepdims=1)*5 + 1*np.random.randn(68, npts)
         curvs.append(curv)
     curvs = np.array(curvs);
     return curvs

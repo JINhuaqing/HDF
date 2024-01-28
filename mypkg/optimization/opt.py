@@ -184,6 +184,7 @@ class HDFOpt():
                 
             if self.model_type.startswith("linear"):
                 Y = Y - Y.mean(axis=0, keepdims=True)
+            # whether remove mean across subjects or not only affect the intercept
             X = X - X.mean(axis=0, keepdims=True)
             Z[:, con_idxs] = ((Z[:, con_idxs] - Z[:, con_idxs].mean(axis=0, keepdims=True))
                                   /Z[:, con_idxs].std(axis=0, keepdims=True))
