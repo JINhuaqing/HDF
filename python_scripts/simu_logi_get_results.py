@@ -26,7 +26,7 @@ from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
 from hdf_utils.data_gen import gen_simu_psd_dataset
 from utils.misc import save_pkl, load_pkl, bcross_entropy_loss
 from optimization.opt import HDFOpt
-from scenarios.real_simu_logi import settings
+from scenarios.real_simu_logi_meg import settings
 
 import argparse
 parser = argparse.ArgumentParser(description='run')
@@ -65,7 +65,7 @@ def _run_fn_extract(seed, N, lam, c):
     res = load_pkl(save_dir/f_name, verbose=0)
     return (seed, N, lam), _get_valset_metric_fn(res)
 
-for c in [0, 0.2, 0.4]:
+for c in [0]:
     save_dir = RES_ROOT/f"simu_logi_setting{setting.setting}_{c*1000:.0f}"
     all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
     with Parallel(n_jobs=n_jobs) as parallel:

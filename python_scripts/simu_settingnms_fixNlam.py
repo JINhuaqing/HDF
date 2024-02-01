@@ -5,7 +5,7 @@
 # 
 # It is under the linear setting
 # 
-# Now, I use the same beta and X from the paper 
+# Now, I use the same beta from the paper but the PSD as X
 
 # In[1]:
 
@@ -20,6 +20,7 @@ from easydict import EasyDict as edict
 from tqdm import tqdm
 from pprint import pprint
 from joblib import Parallel, delayed
+from scipy.stats import chi2
 
 from constants import RES_ROOT, DATA_ROOT
 from hdf_utils.data_gen import gen_simu_meg_dataset
@@ -38,13 +39,16 @@ args = parser.parse_args()
 torch.set_default_dtype(torch.double)
 
 
-
-
-
-
-# # Params
-
-# In[6]:
+opt_lamNs = {
+"nm1":  {"0.0": (14, 1.2), "0.1": (14, 1.2), "0.2": (14, 1.2), "0.4": (14, 1.3)},
+"nm1a":  {"0.0": (14, 0.8), "0.1": (14, 0.8), "0.2": (14, 0.8), "0.4": (14, 0.8)},
+"nm1b":  {"0.0": (14, 1.3), "0.1": (14, 1.3), "0.2": (14, 1.3), "0.4": (14, 1.3)},
+"nm1e":  {"0.0": (14, 0.8), "0.1": (14, 0.8), "0.2": (14, 0.8), "0.4": (14, 0.8)},
+"nm2":  {"0.0": (14, 1.0), "0.1": (14, 1.1), "0.2": (14, 1.0), "0.4": (14, 1.1)},
+"nm2a":  {"0.0": (14, 0.8), "0.1": (14, 0.8), "0.2": (14, 0.8), "0.4": (14, 0.8)},
+"nm2b":  {"0.0": (14, 1.1), "0.1": (14, 1.1), "0.2": (14, 1.1), "0.4": (14, 1.1)},
+"nm2e":  {"0.0": (14, 0.8), "0.1": (14, 0.7), "0.2": (14, 0.7), "0.4": (14, 0.7)},
+}
 
 
 np.random.seed(0)
@@ -54,6 +58,7 @@ setting = settings[args.setting]
 data_gen_params = setting.data_gen_params
 data_gen_params.cs = data_gen_params.cs_fn(c)
 data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
+opt_lamN = opt_lamNs[args.setting][str(c)]
 
 AD_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/AD88_all.pkl")
 Ctrl_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/Ctrl92_all.pkl")
@@ -61,15 +66,22 @@ ts_data = np.concatenate([AD_ts, Ctrl_ts], axis=0)
 stds = ts_data.std(axis=(1, 2));
 ts_data_filter = ts_data[np.sort(np.where(stds>100)[0])];
 
-num_rep = 200
+num_rep0 = 200
+num_rep1 = 1000
 n_jobs = 30
-Cmat = np.eye(data_gen_params.d - len(setting.sel_idx))
+#num_rep_CV = 200
 save_dir = RES_ROOT/f"simu_setting{setting.setting}_{c*1000:.0f}"
 if not save_dir.exists():
     save_dir.mkdir()
 
+
+# In[ ]:
+
 pprint(setting)
 print(f"Save to {save_dir}")
+
+
+
 
 
 def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
@@ -130,29 +142,13 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     return None
 
 
+# In[ ]:
 
 
-all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
+
+
 with Parallel(n_jobs=n_jobs) as parallel:
-    ress = parallel(delayed(_main_run_fn)(seed, lam=lam, N=N, setting=setting, is_save=True, is_cv=True, verbose=1) 
-                    for seed, lam, N 
-                    in tqdm(all_coms, total=len(setting.can_Ns)*len(setting.can_lams)*num_rep))
+    ress = parallel(delayed(_main_run_fn)(seed, lam=opt_lamN[1], N=opt_lamN[0], setting=setting, is_save=True, is_cv=False, verbose=1) 
+                    for seed
+                    in tqdm(range(num_rep0, num_rep1), total=(num_rep1-num_rep0)))
 
-
-def _get_valset_metric_fn(res):
-    valsel_metrics = edict()
-    valsel_metrics.mse_loss = np.mean((res.cv_Y_est- res.Y.numpy())**2);
-    valsel_metrics.mae_loss = np.mean(np.abs(res.cv_Y_est-res.Y.numpy()));
-    valsel_metrics.cv_Y_est = res.cv_Y_est
-    valsel_metrics.tY = res.Y.numpy()
-    return valsel_metrics
-def _run_fn_extract(seed, N, lam, c):
-    f_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
-    res = load_pkl(save_dir/f_name, verbose=0)
-    return (seed, N, lam), _get_valset_metric_fn(res)
-
-all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
-with Parallel(n_jobs=n_jobs) as parallel:
-    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, cur_N, cur_lam, c=c)  for cur_seed, cur_lam, cur_N in tqdm(all_coms, total=num_rep*len(setting.can_Ns)*len(setting.can_lams), desc=f"c: {c}"))
-all_cv_errs = {res[0]:res[1] for res in all_cv_errs_list};
-save_pkl(save_dir/f"all-valsel-metrics.pkl", all_cv_errs, is_force=1)
