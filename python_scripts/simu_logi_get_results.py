@@ -65,7 +65,7 @@ def _run_fn_extract(seed, N, lam, c):
     res = load_pkl(save_dir/f_name, verbose=0)
     return (seed, N, lam), _get_valset_metric_fn(res)
 
-for c in [0]:
+for c in [0, 0.1, 0.2, 0.4]:
     save_dir = RES_ROOT/f"simu_logi_setting{setting.setting}_{c*1000:.0f}"
     all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
     with Parallel(n_jobs=n_jobs) as parallel:

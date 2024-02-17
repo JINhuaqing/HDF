@@ -62,7 +62,7 @@ class HDFOpt():
             SIS_ratio (float, optional): The ratio for the SIS step. A number between (0, 1]. 
                                          If 1, no SIS is performed. Defaults to 0.2.
             inits (list, optional): The initial values for optimization. 
-                                    A list [Gam_init, theta_init, rhok_init] or None. 
+                                    A list [Gam_init, alp_init, rhok_init] or None. 
                                     If None, use zero initial values. Defaults to None.
             model_params (dict, optional): Other parameters for the model. 
             SIS_params (dict, optional): Other parameters for SIS.
@@ -249,7 +249,12 @@ class HDFOpt():
             theta_init = torch.cat([torch.zeros(q), col_vec_fn(Gam_init)/np.sqrt(N)])
             rhok_init = torch.zeros(d_SIS*N)
         else:
-            Gam_init, theta_init, rhok_init = self.inits
+            Gam_init, alp_init, rhok_init = self.inits
+            # adjust the init due to SIS step
+            Gam_init = Gam_init[:, keep_idxs]
+            theta_init = torch.cat([alp_init[:q], col_vec_fn(Gam_init)/np.sqrt(N)])
+            rhok_init = rhok_init[:(N*d_SIS)]
+
         opt_res = self._optimization(model=model,  penalty=pen,  inits=[Gam_init, theta_init, rhok_init], is_pbar=is_pbar)
         
         if not is_cv:
@@ -514,7 +519,6 @@ class HDFOpt():
         
         
         pval = chi2.sf(T_v, Cmat.shape[0]*self.bsp_params.N)
-        #print(T_v, Cmat.shape[0]*self.bsp_params.N)
         
         hypo_test_res = edict()
         hypo_test_res.pval = pval

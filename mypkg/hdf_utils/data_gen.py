@@ -495,6 +495,7 @@ def get_meg_curvs(n, npts, base_data, move_step=20):
     curvs = []
     for sub_ix, init_ix in zip(sel_sub_idx, sel_init_idx):
         curv = base_data[sub_ix, :, init_ix:(init_ix+npts)]
+        #curv = 10*np.random.randn(68, npts)
         curv = (curv - curv.mean(axis=1, keepdims=1))/curv.std(axis=1, keepdims=1)*5 + 1*np.random.randn(68, npts)
         curvs.append(curv)
     curvs = np.array(curvs);

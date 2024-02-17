@@ -5,7 +5,7 @@
 # 
 # It is under the logi setting
 # 
-# Now, I use the same beta from the paper but the PSD as X
+# Now, I use the same beta and X from MEG
 
 # In[1]:
 
@@ -13,20 +13,25 @@
 import sys
 sys.path.append("../mypkg")
 
+
+# In[2]:
+
+
 import numpy as np
 import torch
 import itertools
 from easydict import EasyDict as edict
-from tqdm import tqdm
+from tqdm import  tqdm
 from pprint import pprint
 from joblib import Parallel, delayed
 
 
 from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
-from hdf_utils.data_gen import gen_simu_psd_dataset
+from hdf_utils.data_gen import gen_simu_meg_dataset
 from utils.misc import save_pkl, load_pkl, bcross_entropy_loss
 from optimization.opt import HDFOpt
-from scenarios.real_simu_logi import settings
+from scenarios.real_simu_logi_meg import settings
+
 
 import argparse
 parser = argparse.ArgumentParser(description='run')
@@ -36,19 +41,11 @@ args = parser.parse_args()
 
 torch.set_default_dtype(torch.double)
 
-
-# # Params
-
-# In[7]:
-
 opt_lamNs = {
-"n1" : {"0.0": ( 6, 0.2), "0.1": ( 6, 0.2), "0.2": ( 6, 0.2), "0.4": ( 6, 0.2)}, # CV for N and lam, both entropy or AUC
-"n1a": {"0.0": ( 8, 0.2), "0.1": ( 8, 0.2), "0.2": ( 8, 0.2), "0.4": ( 8, 0.2)}, # fix N = 8, CV for lam, for entropy
-#"n1a": {"0.0": (12, 0.2), "0.1": (12, 0.2), "0.2": (12, 0.2), "0.4": (12, 0.2)}, # CV for N and lam, both entropy or AUC
-#"n2" : {"0.0": ( 6, 0.3), "0.1": ( 6, 0.3), "0.2": ( 6, 0.3), "0.4": ( 6, 0.3)}, # CV for N and lam, for entropy 
-"n2" : {"0.0": ( 6, 0.2), "0.1": ( 6, 0.2), "0.2": ( 6, 0.2), "0.4": ( 6, 0.2)}, # fix N = 6, CV for lam, for AUC
-"n2a": {"0.0": ( 8, 0.2), "0.1": ( 8, 0.2), "0.2": ( 8, 0.2), "0.4": ( 8, 0.1)}, # # fix N = 8, CV for lam, for entropy
-#"n2a": {"0.0": ( 6, 0.1), "0.1": ( 6, 0.1), "0.2": ( 6, 0.1), "0.4": ( 6, 0.1)}, # CV for N and lam, both entropy or AUC
+"nm1" : {"0.0": (6, 0.2), "0.1": (6, 0.2), "0.2": (6, 0.2), "0.4": (6, 0.2)}, 
+"nm1a": {"0.0": (12, 0.2), "0.1": (12, 0.2), "0.2": (12, 0.2), "0.4": (12, 0.2)}, 
+"nm2" : {"0.0": (6, 0.2), "0.1": (6, 0.2), "0.2": (6, 0.2), "0.4": (6, 0.2)}, 
+"nm2a": {"0.0": (8, 0.2), "0.1": (8, 0.2), "0.2": (8, 0.2), "0.4": (8, 0.2)}, 
 }
 
 
@@ -61,6 +58,12 @@ data_gen_params.cs = data_gen_params.cs_fn(c)
 data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
 opt_lamN = opt_lamNs[args.setting][str(c)]
 
+AD_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/AD88_all.pkl")
+Ctrl_ts = load_pkl(DATA_ROOT/"AD_vs_Ctrl_ts/Ctrl92_all.pkl")
+ts_data = np.concatenate([AD_ts, Ctrl_ts], axis=0)
+stds = ts_data.std(axis=(1, 2));
+ts_data_filter = ts_data[np.sort(np.where(stds>100)[0])];
+
 num_rep0 = 200
 num_rep1 = 1000
 n_jobs = 30
@@ -70,27 +73,23 @@ if not save_dir.exists():
     save_dir.mkdir()
 
 
-# In[13]:
-
 
 def _get_logi_int(data_gen_params, n_jobs=30, num_rep=100):
     ress = []
     for inte in tqdm(data_gen_params.intercept_cans):
         gt_alp = np.concatenate([[inte], data_gen_params.gt_alp0])
         def _tmp_fn(seed, data_gen_params=data_gen_params):
-            data = gen_simu_psd_dataset(n=data_gen_params.n, 
-                                        d=data_gen_params.d, 
+            data = gen_simu_meg_dataset(n=data_gen_params.n, 
                                         q=data_gen_params.q, 
                                         types_=data_gen_params.types_, 
                                         gt_alp=gt_alp, 
                                         gt_beta=data_gen_params.gt_beta, 
-                                        freqs=data_gen_params.freqs, 
-                                        data_type=data_gen_params.data_type, 
+                                        npts=data_gen_params.npts, 
+                                        base_data=ts_data_filter,
+                                        data_type=data_gen_params.data_type,
                                         data_params=data_gen_params.data_params, 
                                         seed=seed, 
-                                        is_std=data_gen_params.is_std, 
-                                        verbose=1, 
-                                        is_gen=False);
+                                        verbose=1);
             return data.Y.numpy()
         with Parallel(n_jobs=n_jobs) as parallel:
             res = parallel(delayed(_tmp_fn)(seed) for seed in range(num_rep))
@@ -105,15 +104,13 @@ def _get_logi_int(data_gen_params, n_jobs=30, num_rep=100):
     return gt_alp
 
 
-# In[14]:
+# In[8]:
 
 
 data_gen_params.gt_alp = _get_logi_int(data_gen_params, n_jobs=n_jobs);
-
 pprint(setting)
 print(f"Save at {save_dir}")
 
-# # Simu
 
 def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     """Now (on Aug 25, 2023), if we keep seed the same, the cur_data is the same. 
@@ -134,19 +131,17 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     
     
     if not (save_dir/f_name).exists():
-        cur_data = gen_simu_psd_dataset(n=data_gen_params.n, 
-                            d=data_gen_params.d, 
-                            q=data_gen_params.q, 
-                            types_=data_gen_params.types_, 
-                            gt_alp=data_gen_params.gt_alp, 
-                            gt_beta=data_gen_params.gt_beta, 
-                            freqs=data_gen_params.freqs, 
-                            data_type=data_gen_params.data_type, 
-                            data_params=data_gen_params.data_params, 
-                            seed=seed, 
-                            is_std=data_gen_params.is_std, 
-                            verbose=verbose, 
-                            is_gen=False);
+        cur_data = gen_simu_meg_dataset(n=data_gen_params.n, 
+                                   q=data_gen_params.q, 
+                                   types_=data_gen_params.types_, 
+                                   gt_alp=data_gen_params.gt_alp, 
+                                   gt_beta=data_gen_params.gt_beta, 
+                                   npts=data_gen_params.npts, 
+                                   base_data=ts_data_filter,
+                                   data_type=data_gen_params.data_type,
+                                   data_params=data_gen_params.data_params, 
+                                   seed=seed, 
+                                   verbose=verbose);
         hdf_fit = HDFOpt(lam=_setting.lam, 
                          sel_idx=_setting.sel_idx, 
                          model_type=_setting.model_type,
@@ -175,16 +170,15 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     return None
 
 
-# In[ ]:
-
-
-
-
 with Parallel(n_jobs=n_jobs) as parallel:
     ress = parallel(delayed(_main_run_fn)(seed, lam=opt_lamN[1], N=opt_lamN[0], setting=setting, is_save=True, is_cv=False, verbose=1) 
                     for seed
                     in tqdm(range(num_rep0, num_rep1), total=(num_rep1-num_rep0)))
-# In[ ]:
+
+
+
+
+
 
 
 
