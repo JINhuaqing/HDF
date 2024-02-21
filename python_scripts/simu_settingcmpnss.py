@@ -26,7 +26,6 @@ from hdf_utils.data_gen import gen_simu_sinica_dataset
 from utils.misc import save_pkl, load_pkl
 from optimization.opt import HDFOpt
 from scenarios.simu_linear_sinica import settings
-from hdf_utils.fns_sinica import  fourier_basis_fn
 
 
 
@@ -55,8 +54,6 @@ setting = settings[args.setting]
 data_gen_params = setting.data_gen_params
 data_gen_params.cs = data_gen_params.cs_fn(c)
 data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
-x = np.linspace(0, 1, data_gen_params.npts)
-fourier_basis = fourier_basis_fn(x) 
 
 num_rep = 200
 n_jobs = 30
@@ -83,6 +80,7 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     _setting.N = N
     
     data_gen_params = setting.data_gen_params
+    x = np.linspace(0, 1, data_gen_params.npts)
     
     f_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
     
@@ -94,8 +92,7 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
                                    types_=data_gen_params.types_, 
                                    gt_alp=data_gen_params.gt_alp, 
                                    gt_beta=data_gen_params.gt_beta, 
-                                   npts=data_gen_params.npts, 
-                                   fourier_basis=fourier_basis, 
+                                   x = x,
                                    data_type=data_gen_params.data_type,
                                    data_params=data_gen_params.data_params, 
                                    seed=seed, 

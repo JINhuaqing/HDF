@@ -4,9 +4,10 @@ from easydict import EasyDict as edict
 import torch
 from rpy2 import robjects as robj
 from sklearn.linear_model import LogisticRegression, LinearRegression, Ridge
+from hdf_utils.utils import gen_int_ws
 import pdb
 
-def SIS_GLIM(Y, X, Z, basis_mat, sel_idx, keep_ratio=0.3, model_type="logi", SIS_pen=1):
+def SIS_GLIM(Y, X, Z, basis_mat, sel_idx, ws="simpson", keep_ratio=0.3, model_type="logi", SIS_pen=1):
     """
     The function is to do the sure ind screening when d (num of ROIs) is large under GLIM.
     Ref to FanAoS2010.
@@ -33,12 +34,16 @@ def SIS_GLIM(Y, X, Z, basis_mat, sel_idx, keep_ratio=0.3, model_type="logi", SIS
             clf = Ridge(fit_intercept=False, alpha=SIS_pen)
     elif model_type.lower().startswith("log"):
         clf = LogisticRegression(penalty="l2", fit_intercept=False, random_state=0, C=1/SIS_pen, solver="lbfgs")
+    
+    if isinstance(ws, str):
+        ws = ws.lower()
+        ws = gen_int_ws(X.shape[-1], ws)
         
         
     tbets = []
     for roi_ix in sel_idx:
         Xl = X[:, roi_ix];
-        Sl = (Xl.unsqueeze(-1) * basis_mat.unsqueeze(0)).mean(axis=1); # num of sbj x N
+        Sl = (ws[None, :, None] * Xl.unsqueeze(-1) * basis_mat.unsqueeze(0)).sum(axis=1); # num of sbj x N
         # std Sl, but no need to std Z as the inputed Z is always stded. (on Nov 21, 2023)
         Sl = (Sl - Sl.mean(axis=0, keepdims=True))/(Sl.std(axis=0, keepdims=True))
         cur_X = torch.cat([Z.clone(), Sl], axis=1);
@@ -53,6 +58,9 @@ def SIS_GLIM(Y, X, Z, basis_mat, sel_idx, keep_ratio=0.3, model_type="logi", SIS
     norm_vs = np.sqrt(np.mean(tbets**2, axis=1));
     keep_idxs = np.sort(np.argsort(-norm_vs)[:num_kp])
     return sel_idx[keep_idxs], norm_vs
+
+
+#### -- no use
 
 def SIS_linear(Y, X, Z, basis_mat, keep_ratio=0.3, input_paras={}, ridge_pen=1):
     """The function is to do the sure ind screening when d (num of ROIs) is large under linear model

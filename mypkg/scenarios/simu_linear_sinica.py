@@ -9,15 +9,16 @@ base_params = get_base_params("linear")
 base_params.data_gen_params = edict()
 base_params.data_gen_params.d = 200 # num of ROIs
 base_params.data_gen_params.q = 1 # num of other covariates
-base_params.data_gen_params.npts = 100 # num of pts to evaluate X(s)
+base_params.data_gen_params.npts = 11 # num of pts to evaluate X(s)
 base_params.data_gen_params.types_ = ["int"]
 base_params.data_gen_params.gt_alp = np.array([0]) # we will determine intercept later
 base_params.data_gen_params.data_type = base_params.model_type
 base_params.data_gen_params.data_params={"sigma2":1, "srho":0.3}
-base_params.SIS_params = edict({"SIS_pen": 100, "SIS_basis_N":4})
+base_params.SIS_params = edict({"SIS_pen": 100, "SIS_basis_N":4, "SIS_ws":"simpson"})
+base_params.opt_params.beta = 1 
 base_params.can_Ns = [4, 6, 8, 10, 12, 14]
-def _get_gt_beta(cs, d, npts, fct=1):
-    x = np.linspace(0, 1, npts)
+def _get_gt_beta(cs, d, fct=1):
+    x = np.linspace(0, 1, 101)
     fourier_basis = fourier_basis_fn(x)
     fourier_basis_coefs = ([cs[0]*coef_fn(0.2), cs[1]*coef_fn(0.2), cs[2]*coef_fn(0.2)] + 
                                  [np.zeros(50)] * (d-3-1) +
@@ -36,11 +37,9 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 100 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, 0, 0]
-add_params.data_gen_params.curve_type = "PSD"
 add_params.data_gen_params.data_params["err_dist"] = "normal"
 add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
                                                 add_params.data_gen_params.d,
-                                                add_params.data_gen_params.npts,
                                                 fct=1) 
 add_params.setting = "cmpns1"
 add_params.sel_idx =  np.arange(1, add_params.data_gen_params.d)
@@ -54,11 +53,9 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 100 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, c, 0]
-add_params.data_gen_params.curve_type = "PSD"
 add_params.data_gen_params.data_params["err_dist"] = "normal"
 add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
                                                 add_params.data_gen_params.d,
-                                                add_params.data_gen_params.npts,
                                                 fct=1) 
 add_params.setting = "cmpns2"
 add_params.sel_idx =  np.arange(2, add_params.data_gen_params.d)
@@ -72,11 +69,9 @@ add_params = edict({})
 add_params.data_gen_params = edict(deepcopy(base_params.data_gen_params))
 add_params.data_gen_params.n = 100 # num of data obs to be genareted
 add_params.data_gen_params.cs_fn = lambda c: [c, c, c]
-add_params.data_gen_params.curve_type = "PSD"
 add_params.data_gen_params.data_params["err_dist"] = "normal"
 add_params.data_gen_params.beta_fn = lambda cs: _get_gt_beta(cs,
                                                 add_params.data_gen_params.d,
-                                                add_params.data_gen_params.npts,
                                                 fct=1) 
 add_params.setting = "cmpns3"
 add_params.sel_idx =  np.arange(3, add_params.data_gen_params.d)

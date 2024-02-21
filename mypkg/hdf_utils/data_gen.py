@@ -6,10 +6,13 @@ from pathlib import Path
 from tqdm import trange
 from joblib import Parallel, delayed
 from easydict import EasyDict as edict
+from copy import deepcopy
 
 from constants import DATA_ROOT, MIDRES_ROOT
 from utils.misc import  _set_verbose_level, _update_params, load_pkl, save_pkl
 from utils.functions import logit_fn
+from hdf_utils.utils import integration_fn
+from hdf_utils.fns_sinica import  fourier_basis_fn
 from .data_gen_utils import get_dist, get_sc_my
 from .sgm import SGM
 from .fns_sinica import gen_sini_Xthetas
@@ -193,8 +196,11 @@ def _is_exists(tmp_paras):
             fil =fils[idxs[0]]
             path = MIDRES_ROOT/fil/f"seed_{tmp_paras.seed}.pkl"
             return path if path.exists() else False
-def _get_filename(params):
+def _get_filename(params, npts=None):
     keys = ["d", "n", "npts", "is_std"]
+    if npts is not None:
+        params = deepcopy(params)
+        params["npts"] = npts
     folder_name = 'PSD_'+'_'.join(f"{k}-{params[k]}" for k in keys)
     return folder_name + f'/seed_{params.seed}.pkl'
 
@@ -256,6 +262,24 @@ def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs,
     tmp_paras.is_std = is_std
     con_idxs = [typ =="c" for typ in types_]
     
+    # get simu_curvs for Y
+    freqs0 = np.linspace(freqs[0], freqs[-1], 101)
+    file_path = MIDRES_ROOT/_get_filename(tmp_paras, npts=101)
+    if file_path.exists():
+        simu_curvs0 = load_pkl(file_path, verbose=verbose>=2)
+    else:
+        ofil =  _is_exists(tmp_paras)
+        if ofil:
+            simu_curvs0 = load_pkl(ofil, verbose=verbose>=2)
+        else:
+            simu_curvs0 = gen_simu_psd(n, d, freqs0, prior_sd=10, n_jobs=28, is_prog=verbose>=2, is_std=is_std)
+            if not is_std:
+                simu_curvs0 = simu_curvs0 - simu_curvs0.mean(axis=-1, keepdims=True); # not std, but center it
+            save_pkl(file_path, simu_curvs0, verbose=verbose>=2)
+    simu_curvs0 = simu_curvs0[:n]
+    simu_curvs0 = (simu_curvs0 + np.random.randn(*simu_curvs0.shape)*data_params.psd_noise_sd)
+    
+    # get simu_curvs for X, 
     file_path = MIDRES_ROOT/_get_filename(tmp_paras)
     if file_path.exists():
         if is_gen:
@@ -279,7 +303,8 @@ def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs,
     simu_covs = gen_covs(n, types_)
     
     # linear term and Y
-    int_part = np.sum(gt_beta.T* simu_curvs[:, :, :], axis=1).mean(axis=1)
+    fs = np.sum(gt_beta.T * simu_curvs0, axis=1) # n x npts
+    int_part = integration_fn(fs.T, "sim").numpy()
     cov_part = simu_covs @ gt_alp 
     
     # linear term
@@ -310,8 +335,7 @@ def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs,
 
 
 
-def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts, 
-                            fourier_basis, 
+def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, x, 
                             data_type="linear",
                             data_params={}, seed=0, verbose=2):
     """
@@ -325,8 +349,8 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts,
         types_ (list): List of types for generating covariates.
         gt_alp (list): List of ground truth alpha values.
         gt_beta (list): List of ground truth beta values.
-        npts (int): The number of points
-        fourier_basis(np.ndarray): The fourier basis used to generate X, npts x 50
+        x (array): The points for X, npts vec
+        fourier_basis(np.ndarray): The fourier basis used to generate X, npts0 x 50
         data_params (dict): Dict of other data params
             - sigma2 (float): Variance of the noise for linear model
             - err_dist (str): Distribution of the noise for linear model, norm or t
@@ -360,15 +384,22 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, npts,
     # simulated PSD
     assert len(types_) == q
     assert len(gt_alp) == q
+
+    # this is for the integartion,not for the output X
+    x0 = np.linspace(x[0], x[-1], gt_beta.shape[0])
    
+    fourier_basis = fourier_basis_fn(x)
+    fourier_basis0 = fourier_basis_fn(x0)
+
     thetas = gen_sini_Xthetas(data_params.srho, n, d);
     simu_curvs = thetas[:, :, :fourier_basis.shape[1]] @ fourier_basis.T; # n x d x npts
-    #simu_curvs = thetas @ fourier_basis.T; # n x d x npts
     #simu_curvs = np.random.randn(n, d, npts) * 5
     simu_covs = gen_covs(n, types_)
     
     # linear term and Y
-    int_part = np.sum(gt_beta.T* simu_curvs[:, :, :], axis=1).mean(axis=1)
+    simu_curvs0 = thetas[:, :, :fourier_basis0.shape[1]] @ fourier_basis0.T; # n x d x npts0
+    fs = np.sum(gt_beta.T* simu_curvs0[:, :, :], axis=1) # n x npts0
+    int_part = integration_fn(fs.T, "sim").numpy()
     cov_part = simu_covs @ gt_alp
     
     # linear term

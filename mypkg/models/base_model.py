@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from hdf_utils.likelihood import obt_lin_tm
+from utils.matrix import col_vec_fn
 
 
 class BaseModel():
@@ -24,7 +24,20 @@ class BaseModel():
         self.Y = Y
         self.lin_tm_der = None
         self.log_lik_der1_vs = None # the First dervative of log_likelihood for each obs
+        self.ints_der1 = None # the first dev of ints part w.r.t Gam
     
+    
+    def _obt_int_der1(self):
+        """
+        obt the first dev of ints part w.r.t Gam
+        """
+        basis_mat_trans = self.basis_mat.unsqueeze(0).unsqueeze(-1) # 1 x ncpts x N x 1
+        X_trans = self.X.permute((0, 2, 1)).unsqueeze(2) # n x ncpts x 1 x d
+        vec_part2_raw = basis_mat_trans*X_trans
+        vec_part2_raw = vec_part2_raw.permute((0, 1, 3, 2)).flatten(2)
+        vec_part2 = vec_part2_raw*self.ws.unsqueeze(0).unsqueeze(-1)
+        self.ints_der1 = vec_part2.sum(axis=1)
+        
     def _obt_lin_tm(self, alp, Gam):
         """Give the linear terms of likelihood fn
            args: 
@@ -33,20 +46,24 @@ class BaseModel():
             return:
                lin_tm: the linear terms: scalar or vector of n
         """
-        return obt_lin_tm(self.Z, self.X, alp, Gam, self.basis_mat, self.ws)
+        if self.ints_der1 is None:
+            self._obt_int_der1()
+        cov_tm = self.Z.matmul(alp)
+        
+        Gam_vec = col_vec_fn(Gam)
+        inte_tm = self.ints_der1 @ Gam_vec
+        
+        lin_tm = cov_tm + inte_tm
+        return lin_tm
+    
     
     def _linear_term_der(self):
         """
         # derivative of linear term w.r.t (alp, N^{-1/2}*Gam)
         It is a constant
         """
-        basis_mat_trans = self.basis_mat.unsqueeze(0).unsqueeze(-1) # 1 x ncpts x N x 1
-        X_trans = self.X.permute((0, 2, 1)).unsqueeze(2) # n x ncpts x 1 x d
-        
-        # derivative of linear term w.r.t (alp, N^{-1/2}*Gam)
-        vec_part2_raw = basis_mat_trans*X_trans
-        vec_part2_raw = vec_part2_raw.permute((0, 1, 3, 2)).flatten(2)
-        vec_part2 = vec_part2_raw*self.ws.unsqueeze(0).unsqueeze(-1)
-        vec_part2 = vec_part2.sum(axis=1)*np.sqrt(self.basis_mat.shape[1])
+        if self.ints_der1 is None:
+            self._obt_int_der1()
+        vec_part2 = self.ints_der1*np.sqrt(self.basis_mat.shape[1])
         lin_tm_der = torch.concat([self.Z, vec_part2], axis=1) #n x (q+dxN)
         self.lin_tm_der = lin_tm_der

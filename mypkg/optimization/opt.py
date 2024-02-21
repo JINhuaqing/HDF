@@ -13,6 +13,7 @@ from penalties.scad_pen import SCAD
 from splines import obt_bsp_obasis_Rfn, obt_bsp_basis_Rfn_wrapper
 from hdf_utils.likelihood import obt_lin_tm
 from hdf_utils.SIS import SIS_GLIM
+from hdf_utils.utils import gen_int_ws
 from utils.functions import logit_fn
 from utils.matrix import  col_vec2mat_fn, col_vec_fn
 from utils.misc import  _set_verbose_level, _update_params
@@ -84,7 +85,8 @@ class HDFOpt():
         
         if model_type.startswith("linear"):
             model_params_def = {
-                "norminal_sigma2": 1
+                "norminal_sigma2": 1,
+                "ws": "simpson",
                     }
             opt_params_def = {
                'stop_cv': 0.0005,
@@ -96,7 +98,9 @@ class HDFOpt():
                "linear_theta_update": "cholesky_inv",
              }
         elif model_type.startswith("logi"):
-            model_params_def = {}
+            model_params_def = {
+                "ws": "simpson"
+            }
             opt_params_def = {
                'stop_cv': 0.0005,
                'max_iter': 2000, 
@@ -123,6 +127,7 @@ class HDFOpt():
              "SIS_basis_N": 8,  
              "SIS_basis_ord": bsp_params.basis_ord, 
              "SIS_ratio": SIS_ratio,
+             "SIS_ws": "simpson"
          }
             
         SIS_params = _update_params(SIS_params, SIS_params_def, logger)
@@ -211,6 +216,7 @@ class HDFOpt():
             keep_idxs, _ = SIS_GLIM(Y=Y, X=X, Z=Z, 
                                     basis_mat=self.SIS_basis_mat,
                                     sel_idx=self.sel_idx,
+                                    ws=self.SIS_params.SIS_ws,
                                     keep_ratio=self.SIS_params.SIS_ratio, 
                                     model_type=self.model_type, 
                                     SIS_pen=self.SIS_params.SIS_pen, 
@@ -228,6 +234,12 @@ class HDFOpt():
         
         # Penalty
         pen = SCAD(lams=lam, a=self.pen_params.a, sel_idx=sel_idx_SIS);
+
+        # get ws for integration
+        if isinstance(self.model_params["ws"], str):
+            ws = gen_int_ws(X.shape[-1], self.model_params["ws"])
+        else:
+            ws = self.model_params["ws"] 
         
         # Get model
         if self.model_type.startswith("linear"):
@@ -235,11 +247,13 @@ class HDFOpt():
                                 X=X_SIS, 
                                 Z=Z, 
                                 basis_mat=self.basis_mat, 
+                                ws=ws,
                                 sigma2=self.model_params["norminal_sigma2"])
         elif self.model_type.startswith("logi"):
             model = LogisticModel(Y=Y, 
                                   X=X_SIS, 
                                   Z=Z, 
+                                  ws=ws,
                                   basis_mat=self.basis_mat)
         else:
             raise ValueError(f"{self.model_type} is not supported now.")
