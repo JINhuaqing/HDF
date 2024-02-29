@@ -137,6 +137,7 @@ class HDFOpt():
         SIS_params["SIS_ratio"] = SIS_ratio
         pen_params["lam"] = lam
         
+        
         logger.info(f"opt parmas is {opt_params}.")
         logger.info(f"SIS parmas is {SIS_params}.")
         logger.info(f"model parmas is {model_params}.")
@@ -370,6 +371,11 @@ class HDFOpt():
         """
         assert self.X is not None, f"Plz add data by .add_data() first."
         n = self.data_params.n
+        # get ws for integration
+        if isinstance(self.model_params["ws"], str):
+            ws = gen_int_ws(self.X.shape[-1], self.model_params["ws"])
+        else:
+            ws = self.model_params["ws"] 
         
         num_test = int(n/num_cv_fold)
         full_idx = np.arange(n)
@@ -409,7 +415,7 @@ class HDFOpt():
                                               is_pbar=False, is_cv=True)
             est_alp = cv_res.alpk
             est_Gam = cv_res.Gamk
-            test_Y_est = obt_lin_tm(test_set_Z, test_set_X[:, cur_keep_idxs], est_alp, est_Gam, self.basis_mat)
+            test_Y_est = obt_lin_tm(test_set_Z, test_set_X[:, cur_keep_idxs], est_alp, est_Gam, self.basis_mat, ws=ws)
             if self.model_type.startswith("linear"):
                 test_Y_est_all.append(test_Y_est.numpy())
             elif self.model_type.startswith("logi"):

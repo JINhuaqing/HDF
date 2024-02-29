@@ -5,7 +5,7 @@
 # 
 # It is under the linear setting
 # 
-# Now, I use the same beta from the paper but the PSD as X
+# Now, I use the same beta and X from the paper 
 
 # In[1]:
 
@@ -20,13 +20,12 @@ from easydict import EasyDict as edict
 from tqdm import tqdm
 from pprint import pprint
 from joblib import Parallel, delayed
-from scipy.stats import chi2
 
-from constants import RES_ROOT
-from hdf_utils.data_gen import gen_simu_psd_dataset
+from constants import RES_ROOT 
+from hdf_utils.data_gen import gen_simu_sinica_dataset
 from utils.misc import save_pkl, load_pkl
 from optimization.opt import HDFOpt
-from scenarios.real_simu_linear import settings
+from scenarios.simu_linear_sinica0 import settings
 
 
 
@@ -40,15 +39,18 @@ torch.set_default_dtype(torch.double)
 
 
 opt_lamNs = {
-"n1":  {"0.0": (14, 1), "0.1": (14, 1), "0.2": (14, 1), "0.4": (14, 1)},
-"n1a":  {"0.0": (14, 0.6), "0.1": (14, 0.6), "0.2": (14, 0.6), "0.4": (14, 0.6)}, 
-"n1b": {"0.0": (14, 1), "0.1": (14, 1), "0.2": (14, 1), "0.4": (14, 1)}, 
-"n1e":  {"0.0": (14, 0.6), "0.1": (14, 0.6), "0.2": (14, 0.6), "0.4": (14, 0.6)},
-"n2":  {"0.0": (14, 0.9), "0.1": (14, 0.9), "0.2": (14, 0.9), "0.4": (14, 0.9)}, 
-"n2a":  {"0.0": (14, 0.6), "0.1": (14, 0.6), "0.2": (14, 0.6), "0.4": (14, 0.6)}, 
-"n2b":  {"0.0": (14, 0.9), "0.1": (14, 0.9), "0.2": (14, 0.9), "0.4": (14, 0.9)}, 
-"n2e":  {"0.0": (14, 0.6), "0.1": (14, 0.6), "0.2": (14, 0.6), "0.4": (14, 0.6)},
+"cmpn0s1":  {"0.0": (8, 1.1), "0.1": (8, 1.1), "0.2": (8, 1.1), "0.4": (8, 1.1)},
+"cmpn0s1b":  {"0.0": (8, 1.1), "0.1": (8, 1.1), "0.2": (8, 1.1), "0.4": (8, 1.1)},
+"cmpn0s2":  {"0.0": (6, 0.9), "0.1": (6, 0.9), "0.2": (6, 0.9), "0.4": (6, 0.9)},
+"cmpn0s2b":  {"0.0": (6, 0.9), "0.1": (6, 0.9), "0.2": (6, 0.9), "0.4": (8, 1.0)},
 }
+
+
+
+
+# # Params
+
+# In[6]:
 
 
 np.random.seed(0)
@@ -63,19 +65,12 @@ opt_lamN = opt_lamNs[args.setting][str(c)]
 num_rep0 = 200
 num_rep1 = 1000
 n_jobs = 30
-#num_rep_CV = 200
 save_dir = RES_ROOT/f"simu_setting{setting.setting}_{c*1000:.0f}"
 if not save_dir.exists():
     save_dir.mkdir()
 
-
-# In[ ]:
-
 pprint(setting)
 print(f"Save to {save_dir}")
-
-
-
 
 
 def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
@@ -92,24 +87,23 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     _setting.N = N
     
     data_gen_params = setting.data_gen_params
+    x = np.linspace(0, 1, data_gen_params.npts)
     
     f_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
     
     
     if not (save_dir/f_name).exists():
-        cur_data = gen_simu_psd_dataset(n=data_gen_params.n, 
-                            d=data_gen_params.d, 
-                            q=data_gen_params.q, 
-                            types_=data_gen_params.types_, 
-                            gt_alp=data_gen_params.gt_alp, 
-                            gt_beta=data_gen_params.gt_beta, 
-                            freqs=data_gen_params.freqs, 
-                            data_type=data_gen_params.data_type, 
-                            data_params=data_gen_params.data_params, 
-                            seed=seed, 
-                            is_std=data_gen_params.is_std, 
-                            verbose=verbose, 
-                            is_gen=False);
+        cur_data = gen_simu_sinica_dataset(n=data_gen_params.n, 
+                                   d=data_gen_params.d, 
+                                   q=data_gen_params.q, 
+                                   types_=data_gen_params.types_, 
+                                   gt_alp=data_gen_params.gt_alp, 
+                                   gt_beta=data_gen_params.gt_beta, 
+                                   x = x,
+                                   data_type=data_gen_params.data_type,
+                                   data_params=data_gen_params.data_params, 
+                                   seed=seed, 
+                                   verbose=verbose);
         hdf_fit = HDFOpt(lam=_setting.lam, 
                          sel_idx=_setting.sel_idx, 
                          model_type=_setting.model_type,
@@ -136,9 +130,6 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
         hdf_fit = load_pkl(save_dir/f_name, verbose>=2);
         
     return None
-
-
-# In[ ]:
 
 
 

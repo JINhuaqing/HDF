@@ -13,6 +13,7 @@ from utils.misc import  _set_verbose_level, _update_params, load_pkl, save_pkl
 from utils.functions import logit_fn
 from hdf_utils.utils import integration_fn
 from hdf_utils.fns_sinica import  fourier_basis_fn
+from splines import obt_bsp_obasis_Rfn, obt_bsp_basis_Rfn_wrapper
 from .data_gen_utils import get_dist, get_sc_my
 from .sgm import SGM
 from .fns_sinica import gen_sini_Xthetas
@@ -263,21 +264,21 @@ def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs,
     con_idxs = [typ =="c" for typ in types_]
     
     # get simu_curvs for Y
-    freqs0 = np.linspace(freqs[0], freqs[-1], 101)
-    file_path = MIDRES_ROOT/_get_filename(tmp_paras, npts=101)
-    if file_path.exists():
-        simu_curvs0 = load_pkl(file_path, verbose=verbose>=2)
-    else:
-        ofil =  _is_exists(tmp_paras)
-        if ofil:
-            simu_curvs0 = load_pkl(ofil, verbose=verbose>=2)
-        else:
-            simu_curvs0 = gen_simu_psd(n, d, freqs0, prior_sd=10, n_jobs=28, is_prog=verbose>=2, is_std=is_std)
-            if not is_std:
-                simu_curvs0 = simu_curvs0 - simu_curvs0.mean(axis=-1, keepdims=True); # not std, but center it
-            save_pkl(file_path, simu_curvs0, verbose=verbose>=2)
-    simu_curvs0 = simu_curvs0[:n]
-    simu_curvs0 = (simu_curvs0 + np.random.randn(*simu_curvs0.shape)*data_params.psd_noise_sd)
+    #freqs0 = np.linspace(freqs[0], freqs[-1], 101)
+    #file_path = MIDRES_ROOT/_get_filename(tmp_paras, npts=101)
+    #if file_path.exists():
+    #    simu_curvs0 = load_pkl(file_path, verbose=verbose>=2)
+    #else:
+    #    ofil =  _is_exists(tmp_paras)
+    #    if ofil:
+    #        simu_curvs0 = load_pkl(ofil, verbose=verbose>=2)
+    #    else:
+    #        simu_curvs0 = gen_simu_psd(n, d, freqs0, prior_sd=10, n_jobs=28, is_prog=verbose>=2, is_std=is_std)
+    #        if not is_std:
+    #            simu_curvs0 = simu_curvs0 - simu_curvs0.mean(axis=-1, keepdims=True); # not std, but center it
+    #        save_pkl(file_path, simu_curvs0, verbose=verbose>=2)
+    #simu_curvs0 = simu_curvs0[:n]
+    ##simu_curvs0 = (simu_curvs0 + np.random.randn(*simu_curvs0.shape)*data_params.psd_noise_sd)
     
     # get simu_curvs for X, 
     file_path = MIDRES_ROOT/_get_filename(tmp_paras)
@@ -303,7 +304,7 @@ def gen_simu_psd_dataset(n, d, q, types_, gt_alp, gt_beta, freqs,
     simu_covs = gen_covs(n, types_)
     
     # linear term and Y
-    fs = np.sum(gt_beta.T * simu_curvs0, axis=1) # n x npts
+    fs = np.sum(gt_beta.T * simu_curvs, axis=1) # n x npts
     int_part = integration_fn(fs.T, "sim").numpy()
     cov_part = simu_covs @ gt_alp 
     
@@ -372,10 +373,12 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, x,
             "sigma2": 1, 
             "err_dist": "norm", 
             "srho": 0.3,
+            "basis_type": "fourier", 
         }
     elif data_type.startswith("logi"):
         data_params_def = {
             "srho": 0.3,
+            "basis_type": "fourier", 
         }
     else:
         raise ValueError(f"{data_type} is not supported now.")
@@ -388,16 +391,26 @@ def gen_simu_sinica_dataset(n, d, q, types_, gt_alp, gt_beta, x,
     # this is for the integartion,not for the output X
     x0 = np.linspace(x[0], x[-1], gt_beta.shape[0])
    
-    fourier_basis = fourier_basis_fn(x)
-    fourier_basis0 = fourier_basis_fn(x0)
+    if data_params["basis_type"].lower().startswith("bsp"):
+        basis_vs = obt_bsp_basis_Rfn_wrapper(x, N=10, bsp_ord=4)
+        basis_vs0 = obt_bsp_basis_Rfn_wrapper(x0, N=10, bsp_ord=4)
+        thetas = np.random.randn(n, d, 50)*5
+        errsX = np.random.randn(n, d, len(x)) * 0.5
 
-    thetas = gen_sini_Xthetas(data_params.srho, n, d);
-    simu_curvs = thetas[:, :, :fourier_basis.shape[1]] @ fourier_basis.T; # n x d x npts
+    elif data_params["basis_type"].lower().startswith("four"):
+        basis_vs = fourier_basis_fn(x)
+        basis_vs0 = fourier_basis_fn(x0)
+        thetas = gen_sini_Xthetas(data_params.srho, n, d);
+        errsX = np.random.randn(n, d, len(x)) * 0.0
+
+    simu_curvs = thetas[:, :, :basis_vs.shape[1]] @ basis_vs.T; # n x d x npts
+    simu_curvs = simu_curvs + errsX
     #simu_curvs = np.random.randn(n, d, npts) * 5
     simu_covs = gen_covs(n, types_)
     
     # linear term and Y
-    simu_curvs0 = thetas[:, :, :fourier_basis0.shape[1]] @ fourier_basis0.T; # n x d x npts0
+    simu_curvs0 = thetas[:, :, :basis_vs0.shape[1]] @ basis_vs0.T; # n x d x npts0
+    simu_curvs0 = simu_curvs0 + errsX
     fs = np.sum(gt_beta.T* simu_curvs0[:, :, :], axis=1) # n x npts0
     int_part = integration_fn(fs.T, "sim").numpy()
     cov_part = simu_covs @ gt_alp

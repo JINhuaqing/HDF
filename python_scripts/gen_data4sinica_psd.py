@@ -55,7 +55,7 @@ data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
 
 save_dir = MIDRES_ROOT/f"matlab_simu_data/simu_setting{setting.setting}"
 if not save_dir.exists():
-    save_dir.mkdir()
+    save_dir.mkdir(exist_ok=True)
 
 
 # In[ ]:

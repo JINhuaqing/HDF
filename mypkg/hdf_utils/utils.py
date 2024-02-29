@@ -33,11 +33,16 @@ def gen_int_ws(npts, type_="naive"):
     if type_.startswith("nai"):
         ws = torch.ones(npts)/npts
     elif type_.startswith("sim"):
-        assert (npts)%2 == 1, "There must be uneven num of pts"
         Q = npts - 1
         ws = torch.ones(npts)/(3*Q)
         ws[2:-1:2] = ws[2:-1:2]*2
         ws[1:-1:2] = ws[1:-1:2]*4
+        if (npts)%2 == 0:
+           # apply Simpson's 3/8 rule on last 3 intervals
+            ws[-1] = 3/8/Q
+            ws[-2] = 9/8/Q
+            ws[-3] = 9/8/Q
+            ws[-4] = (1/Q) * (1/3 + 3/8)
     else: 
         raise NotImplementedError
     

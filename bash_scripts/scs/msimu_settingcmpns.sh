@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --mem=200gb                          # Job memory request
 #SBATCH --partition=long                    # Run on partition "dgx" (e.g. not the default partition called "long")
-#SBATCH --output=logs/HDF-%x.out
+#SBATCH --output=scs/logs/HDF-%x.out
 #SBATCH -J mtest2_4
 #SBATCH --cpus-per-task=40
 #SBATCH --time=48:00:00

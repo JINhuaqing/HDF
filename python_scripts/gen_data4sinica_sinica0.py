@@ -27,8 +27,7 @@ from scipy.io import savemat
 from constants import DATA_ROOT, MIDRES_ROOT
 from hdf_utils.data_gen import gen_simu_sinica_dataset
 from utils.misc import save_pkl, load_pkl
-from scenarios.simu_linear_sinica import settings
-from hdf_utils.fns_sinica import  fourier_basis_fn
+from scenarios.simu_linear_sinica0 import settings
 
 from joblib import Parallel, delayed
 
@@ -53,12 +52,10 @@ setting = settings[args.setting]
 data_gen_params = setting.data_gen_params
 data_gen_params.cs = data_gen_params.cs_fn(c)
 data_gen_params.gt_beta = data_gen_params.beta_fn(data_gen_params.cs)
-x = np.linspace(0, 1, data_gen_params.npts)
-fourier_basis = fourier_basis_fn(x) 
 
 save_dir = MIDRES_ROOT/f"matlab_simu_data/simu_setting{setting.setting}"
 if not save_dir.exists():
-    save_dir.mkdir()
+    save_dir.mkdir(exist_ok=True)
 
 
 # In[ ]:
@@ -79,6 +76,9 @@ def _run_fn(seed, verbose=0):
     f_name = f'c1_{c*1000:.0f}_seed_{seed}.mat'
     
     
+    data_gen_params = setting.data_gen_params
+    x = np.linspace(0, 1, data_gen_params.npts)
+
     if not (save_dir/f_name).exists():
         cur_data = gen_simu_sinica_dataset(n=data_gen_params.n, 
                                    d=data_gen_params.d, 
@@ -86,8 +86,7 @@ def _run_fn(seed, verbose=0):
                                    types_=data_gen_params.types_, 
                                    gt_alp=data_gen_params.gt_alp, 
                                    gt_beta=data_gen_params.gt_beta, 
-                                   npts=data_gen_params.npts, 
-                                   fourier_basis=fourier_basis, 
+                                   x = x,
                                    data_type=data_gen_params.data_type,
                                    data_params=data_gen_params.data_params, 
                                    seed=seed, 

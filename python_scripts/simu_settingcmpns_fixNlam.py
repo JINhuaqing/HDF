@@ -3,7 +3,7 @@
 
 # This file contains python code to mimic real setting
 # 
-# It is under the logi setting
+# It is under the linear setting
 # 
 # Now, I use the same beta from the paper but the PSD as X
 
@@ -20,13 +20,15 @@ from easydict import EasyDict as edict
 from tqdm import tqdm
 from pprint import pprint
 from joblib import Parallel, delayed
+from scipy.stats import chi2
 
-
-from constants import DATA_ROOT, RES_ROOT, FIG_ROOT, MIDRES_ROOT
+from constants import RES_ROOT
 from hdf_utils.data_gen import gen_simu_psd_dataset
-from utils.misc import save_pkl, load_pkl, bcross_entropy_loss
+from utils.misc import save_pkl, load_pkl
 from optimization.opt import HDFOpt
-from scenarios.real_simu_logi import settings
+from scenarios.simu_linear_psd import settings
+
+
 
 import argparse
 parser = argparse.ArgumentParser(description='run')
@@ -36,16 +38,11 @@ args = parser.parse_args()
 
 torch.set_default_dtype(torch.double)
 
-
-# # Params
-
-# In[7]:
-
 opt_lamNs = {
-"n1" : {"0.0": ( 6, 0.2), "0.1": ( 6, 0.2), "0.2": ( 6, 0.2), "0.4": ( 6, 0.2)}, 
-"n1a": {"0.0": (12, 0.2), "0.1": (12, 0.2), "0.2": (12, 0.2), "0.4": (12, 0.2)}, 
-"n2" : {"0.0": ( 6, 0.3), "0.1": ( 6, 0.3), "0.2": ( 6, 0.3), "0.4": ( 6, 0.3)}, 
-"n2a": {"0.0": ( 6, 0.1), "0.1": ( 6, 0.1), "0.2": ( 6, 0.1), "0.4": ( 6, 0.1)}, 
+"cmpn1":  {"0.0": (6, 0.9), "0.1": (6, 0.9), "0.2": (8, 1.1), "0.4": (8, 1.1)},
+"cmpn1b":  {"0.0": (8, 1.1), "0.1": (8, 1.1), "0.2": (8, 1.1), "0.4": (8, 1.1)},
+"cmpn2":  {"0.0": (6, 0.9), "0.1": (6, 0.9), "0.2": (6, 0.9), "0.4": (6, 0.9)},
+"cmpn2b":  {"0.0": (6, 0.9), "0.1": (6, 0.9), "0.2": (6, 0.8), "0.4": (6, 0.9)},
 }
 
 
@@ -61,56 +58,19 @@ opt_lamN = opt_lamNs[args.setting][str(c)]
 num_rep0 = 200
 num_rep1 = 1000
 n_jobs = 30
-Cmat = np.eye(data_gen_params.d - len(setting.sel_idx))
-save_dir = RES_ROOT/f"simu_logi_setting{setting.setting}_{c*1000:.0f}"
+save_dir = RES_ROOT/f"simu_setting{setting.setting}_{c*1000:.0f}"
 if not save_dir.exists():
     save_dir.mkdir()
 
 
-# In[13]:
-
-
-def _get_logi_int(data_gen_params, n_jobs=30, num_rep=100):
-    ress = []
-    for inte in tqdm(data_gen_params.intercept_cans):
-        gt_alp = np.concatenate([[inte], data_gen_params.gt_alp0])
-        def _tmp_fn(seed, data_gen_params=data_gen_params):
-            data = gen_simu_psd_dataset(n=data_gen_params.n, 
-                                        d=data_gen_params.d, 
-                                        q=data_gen_params.q, 
-                                        types_=data_gen_params.types_, 
-                                        gt_alp=gt_alp, 
-                                        gt_beta=data_gen_params.gt_beta, 
-                                        freqs=data_gen_params.freqs, 
-                                        data_type=data_gen_params.data_type, 
-                                        data_params=data_gen_params.data_params, 
-                                        seed=seed, 
-                                        is_std=data_gen_params.is_std, 
-                                        verbose=1, 
-                                        is_gen=False);
-            return data.Y.numpy()
-        with Parallel(n_jobs=n_jobs) as parallel:
-            res = parallel(delayed(_tmp_fn)(seed) for seed in range(num_rep))
-        ress.append(np.array(res))
-
-
-    # get the intercept
-    Yms = np.array([res.mean() for res in ress])
-    intercept = data_gen_params.intercept_cans[np.argmin(np.abs(Yms-0.5))]
-    print(f"The mean of Y is {Yms[np.argmin(np.abs(Yms-0.5))]:.3f} under intercept {intercept:.3f}.")
-    gt_alp = np.concatenate([[intercept], data_gen_params.gt_alp0])
-    return gt_alp
-
-
-# In[14]:
-
-
-data_gen_params.gt_alp = _get_logi_int(data_gen_params, n_jobs=n_jobs);
+# In[ ]:
 
 pprint(setting)
-print(f"Save at {save_dir}")
+print(f"Save to {save_dir}")
 
-# # Simu
+
+
+
 
 def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     """Now (on Aug 25, 2023), if we keep seed the same, the cur_data is the same. 
@@ -172,17 +132,10 @@ def _main_run_fn(seed, lam, N, setting, is_save=False, is_cv=False, verbose=2):
     return None
 
 
-# In[ ]:
-
-
 
 
 with Parallel(n_jobs=n_jobs) as parallel:
     ress = parallel(delayed(_main_run_fn)(seed, lam=opt_lamN[1], N=opt_lamN[0], setting=setting, is_save=True, is_cv=False, verbose=1) 
                     for seed
                     in tqdm(range(num_rep0, num_rep1), total=(num_rep1-num_rep0)))
-# In[ ]:
-
-
-
 
