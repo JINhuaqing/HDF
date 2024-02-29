@@ -138,11 +138,11 @@ class HDFOpt():
         pen_params["lam"] = lam
         
         
-        logger.info(f"opt parmas is {opt_params}.")
-        logger.info(f"SIS parmas is {SIS_params}.")
-        logger.info(f"model parmas is {model_params}.")
-        logger.info(f"penalty parmas is {pen_params}.")
-        logger.info(f"bspline parmas is {bsp_params}.")
+        logger.info(f"opt params is {opt_params}.")
+        logger.info(f"SIS params is {SIS_params}.")
+        logger.info(f"model params is {model_params}.")
+        logger.info(f"penalty params is {pen_params}.")
+        logger.info(f"bspline params is {bsp_params}.")
         
         if bsp_params.is_orth_basis:
             self.obt_bsp = obt_bsp_obasis_Rfn
@@ -497,7 +497,7 @@ class HDFOpt():
         })
         hypo_params = _update_params(hypo_params, hypo_params_def, logger)
         hypo_params["Cmat"] = Cmat
-        logger.info(f"hypo parmas is {hypo_params}.")
+        logger.info(f"hypo params is {hypo_params}.")
         self.hypo_params = hypo_params
 
         if ts is not None:
