@@ -327,6 +327,12 @@ class HDFOpt():
             Gam_theta_diff = opt.Gamk - col_vec2mat_fn(opt.thetak[q:], nrow=N)*np.sqrt(N)
             Gam_theta_diff_norm = torch.norm(Gam_theta_diff)/(torch.norm(opt.Gamk)+eps)
             
+            # when opt.Gamk is very small, use the norm of diff
+            # it is mainly  for logi case where gamk ==0 makes unconvergent
+            # for linear, it can still converge
+            if torch.norm(opt.Gamk) < 1e-10:
+                Gam_theta_diff_norm = torch.norm(Gam_theta_diff)
+                Gam_diff_norm = torch.norm(Gam_diff)
             stop_v = np.max([alp_diff_norm.item(),
                              Gam_diff_norm.item(), 
                              theta_diff_norm.item(), 
