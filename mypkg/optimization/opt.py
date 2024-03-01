@@ -299,7 +299,8 @@ class HDFOpt():
         one_step_params.pop("max_iter")
         one_step_params.pop("one_step_verbose")
         one_step_params["verbose"] = opt_params.one_step_verbose
-        one_step_params["linear_mat"] = None
+        if isinstance(model, LinearModel):
+            one_step_params["linear_mat"] = None
         for ix in prg_bar:
             opt = OneStepOpt(Gamk=Gam_init, 
                              rhok=rhok_init, 
