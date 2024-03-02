@@ -86,12 +86,23 @@ add_params.sel_idx =  np.arange(0, add_params.data_gen_params.d)
 add_params.SIS_ratio = 0.2
 setting.update(add_params)
 
+opt_lamNs = {
+100: (12, 1.4),
+200: (12, 1.0),
+400: (10, 0.6),
+800: (10, 0.5),
+1600: (10, 0.4),
+3200: (10, 0.3),
+}
+
 
 data_gen_params = setting.data_gen_params
 x = np.linspace(0, 1, data_gen_params.npts)
+opt_lamN = opt_lamNs[args.n]
 
 
-num_rep = 200
+num_rep = 1000
+num_rep0 = 200
 n_jobs = 30
 save_dir = RES_ROOT/f"simu_alpconv_n{args.n}"
 if not save_dir.exists():
@@ -162,27 +173,9 @@ def _main_run_fn(seed, n, lam, N, setting, is_save=False, is_cv=False, verbose=2
 
 
 
-#all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
-#with Parallel(n_jobs=n_jobs) as parallel:
-#    ress = parallel(delayed(_main_run_fn)(seed, n=args.n, lam=lam, N=N, setting=setting, is_save=True, is_cv=True, verbose=1) 
-#                    for seed, lam, N 
-#                    in tqdm(all_coms, total=len(setting.can_Ns)*len(setting.can_lams)*num_rep))
-
-
-def _get_valset_metric_fn(res):
-    valsel_metrics = edict()
-    valsel_metrics.mse_loss = np.mean((res.cv_Y_est- res.Y.numpy())**2);
-    valsel_metrics.mae_loss = np.mean(np.abs(res.cv_Y_est-res.Y.numpy()));
-    valsel_metrics.cv_Y_est = res.cv_Y_est
-    valsel_metrics.tY = res.Y.numpy()
-    return valsel_metrics
-def _run_fn_extract(seed, N, lam):
-    f_name = f"seed_{seed:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
-    res = load_pkl(save_dir/f_name, verbose=0)
-    return (seed, N, lam), _get_valset_metric_fn(res)
-
-all_coms = itertools.product(range(0, num_rep), setting.can_lams, setting.can_Ns)
+N, lam = opt_lamN
 with Parallel(n_jobs=n_jobs) as parallel:
-    all_cv_errs_list = parallel(delayed(_run_fn_extract)(cur_seed, cur_N, cur_lam)  for cur_seed, cur_lam, cur_N in tqdm(all_coms, total=num_rep*len(setting.can_Ns)*len(setting.can_lams)))
-all_cv_errs = {res[0]:res[1] for res in all_cv_errs_list};
-save_pkl(save_dir/f"all-valsel-metrics.pkl", all_cv_errs, is_force=1)
+    ress = parallel(delayed(_main_run_fn)(seed, n=args.n, lam=lam, N=N, setting=setting, is_save=True, is_cv=False, verbose=1) 
+                    for seed
+                    in tqdm(range(num_rep0, num_rep), total=num_rep-num_rep0))
+
