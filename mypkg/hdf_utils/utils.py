@@ -18,7 +18,7 @@ def gen_lam_seq(low, up, nlam):
     lam_seq = np.concatenate([[low], lam_seq])
     return lam_seq
 
-def gen_int_ws(npts, type_="naive"):
+def gen_int_ws(npts, type_="simpson"):
     """
     Generate the weights for the numerical integartion
     args:
@@ -48,7 +48,7 @@ def gen_int_ws(npts, type_="naive"):
     
     return ws
 
-def integration_fn(fs, ws="naive"):
+def integration_fn(fs, ws="simpson"):
     """
     Do numerical integeration for function f(x);
     args:

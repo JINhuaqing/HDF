@@ -196,6 +196,7 @@ class HDFOpt():
                                   /Z[:, con_idxs].std(axis=0, keepdims=True))
         self.X, self.Y, self.Z = X, Y, Z
         self.data_params.n = X.shape[0]
+        self.data_params.npts = X.shape[-1]
         self.data_params.d = X.shape[1]
         self.data_params.q = Z.shape[1]
         self.con_idxs = con_idxs
@@ -274,6 +275,7 @@ class HDFOpt():
         
         if not is_cv:
             self.keep_idxs = keep_idxs
+            self.sel_idx_SIS = sel_idx_SIS
             return opt_res
         else:
             return opt_res, keep_idxs
@@ -445,10 +447,11 @@ class HDFOpt():
         
         
         # get the non-zeros index
-        M_idxs = np.delete(np.arange(d), self.sel_idx) # the M set
+        M_idxs0 = np.delete(np.arange(len(self.keep_idxs)), self.sel_idx_SIS) # the M set under SIS idxs
+        #M_idxs0 = np.delete(np.arange(d), self.sel_idx) # the M set
         est_theta = torch.cat([est_alp, col_vec_fn(est_Gam)/np.sqrt(self.bsp_params.N)])
         nonzero_idxs = torch.nonzero(torch.norm(est_Gam, dim=0)).reshape(-1).numpy()
-        MS_unions = np.sort(np.union1d(M_idxs, nonzero_idxs))
+        MS_unions = np.sort(np.union1d(M_idxs0, nonzero_idxs))
         keep_idxs_test = MS2idxs(q, self.bsp_params.N, MS_unions)
         
         Q_mat_part = Q_mat[keep_idxs_test][:, keep_idxs_test]
@@ -459,12 +462,36 @@ class HDFOpt():
         self.hypo_utils.Sig_mat_part = Sig_mat_part
         self.hypo_utils.keep_idxs_test = keep_idxs_test
         # num of non zeros betas but not in M set
-        self.hypo_utils.k = len(np.setdiff1d(nonzero_idxs, M_idxs))
+        #self.hypo_utils.k = len(np.setdiff1d(nonzero_idxs, M_idxs0))
         if self.model_type.startswith("linear"):
             est_sigma2 = torch.mean((self.opt_res.model.Y - self.opt_res.model._obt_lin_tm(est_alp, est_Gam))**2)
             self.hypo_utils.est_sigma2 = est_sigma2
         
-    def _get_Amat(self, k, Cmat):
+    def _get_Amat(self, Cmat):
+        """Get A matrix for hypothesis test
+            Cmat: Hypothesis matrix
+            other parameters
+                    required: N, m, q
+        """
+        M_idxs0 = np.delete(np.arange(len(self.keep_idxs)), self.sel_idx_SIS) # the M set under SIS idxs
+        m = len(M_idxs0)
+        N = self.bsp_params.N
+        q = self.data_params.q
+        nonzero_idxs = torch.nonzero(torch.norm(self.est_Gam, dim=0)).reshape(-1).numpy()
+        M_idxs0_nonzero = np.where([idx in M_idxs0 for idx in nonzero_idxs])[0] # the index in set with beta!= 0
+        part1 = np.kron(Cmat, np.eye(N))
+        part2 = np.zeros((m*N, q+len(nonzero_idxs)*N))
+        for idx, midxnon in enumerate(M_idxs0_nonzero):
+            lix0 = idx* N
+            hix0 = idx* N + N
+            lix1 = midxnon * N + q
+            hix1 = midxnon * N + N + q
+            part2[lix0:hix0, lix1:hix1] = np.eye(N)
+        A = part1 @ part2
+        return A
+
+    # to be deprecated (on Mar 5, 2024)
+    def _get_Amat1(self, k, Cmat):
         """Get A matrix for hypothesis test
             k: Num of elements in S
             Cmat: Hypothesis matrix
@@ -531,7 +558,7 @@ class HDFOpt():
         est_theta = torch.cat([est_alp, col_vec_fn(est_Gam)/np.sqrt(self.bsp_params.N)])
     
         # A mat
-        Amat = torch.Tensor(self._get_Amat(self.hypo_utils.k, hypo_params.Cmat))
+        Amat = torch.Tensor(self._get_Amat(hypo_params.Cmat))
         
         # calculate Test stats
         Q_mat_part_inv = torch.linalg.pinv(self.hypo_utils.Q_mat_part, hermitian=True, rtol=hypo_params.svdinv_eps_Q)
@@ -569,6 +596,39 @@ class HDFOpt():
             self.SIS_basis_mat = None
         save_pkl(path, self, verbose=self.verbose>=2, is_force=is_force)
     
+    def get_covmat(self, rtol=1e-7):
+        """The cov mat for further inference, e.g., get CI 
+        """
+        if self.hypo_utils is None:
+            self._prepare_hypotest()
+        q = self.data_params.q
+        n = self.data_params.n
+        N = self.bsp_params.N
+            
+        Q_mat_part = self.hypo_utils.Q_mat_part
+        Sig_mat_part = self.hypo_utils.Sig_mat_part;
+        Q_mat_part_inv = torch.linalg.pinv(Q_mat_part, hermitian=True, rtol=rtol);
+        cov_mat_full = Q_mat_part_inv @ Sig_mat_part @ Q_mat_part_inv / n;
+        
+        cov_mat_alp = cov_mat_full[:q, :q]
+        nonzero_idxs = torch.nonzero(torch.norm(self.est_Gam,dim=0)).reshape(-1).numpy()
+        M_idxs0 = np.delete(np.arange(len(self.keep_idxs)), self.sel_idx_SIS)
+        if len(M_idxs0) >= 1:
+            cov_idxs = []
+            for idx in M_idxs0:
+                tmp = np.where(nonzero_idxs==idx)[0][0]
+                cov_idxs.append(np.arange(q+tmp*N, q+(tmp+1)*N))
+            cov_idxs = np.sort(np.concatenate(cov_idxs))
+            cov_mat_beta = cov_mat_full[cov_idxs][:, cov_idxs]
+        else:
+            cov_mat_beta = []
+        cov_mats = edict()
+        cov_mats.alpha = cov_mat_alp
+        cov_mats.beta = cov_mat_beta
+        cov_mats.full = cov_mat_full
+        return cov_mats
+        
+
     def GIC_fn(self, fct="BIC"):
         """
         This function calculates the generalized information criterion (GIC)

@@ -6,7 +6,7 @@ data = load(file_name);
 
 
 fmin = 2; %Hz
-fmax = 45;
+fmax = 35;
 fs=600;
 nfreqs = 100;
 
