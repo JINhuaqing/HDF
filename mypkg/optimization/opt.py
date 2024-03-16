@@ -170,6 +170,10 @@ class HDFOpt():
         self.est_alp, self.est_Gam = None, None
         self.hypo_utils = None
         self.data_params = edict({})
+        self.Ymean = None
+        self.Xmean = None
+        self.Zmean = None
+        self.Zstd = None
     
     def add_data(self, X, Y, Z):
         """
@@ -178,6 +182,7 @@ class HDFOpt():
             Y (torch.Tensor): The response, a tensor of shape (num_sub,).
             Z (torch.Tensor): The covariates, a tensor of shape (num_sub, num_covs).
         """
+
         n, q = Z.shape
         _, _, npts = X.shape
         # Standardize Z and center Y and X across subjects
@@ -189,11 +194,15 @@ class HDFOpt():
                 con_idxs = [typ =="c" for typ in cov_types]
                 
             if self.model_type.startswith("linear"):
-                Y = Y - Y.mean(axis=0, keepdims=True)
+                self.Ymean = Y.mean(axis=0, keepdims=True)
+                Y = Y - self.Ymean
             # whether remove mean across subjects or not only affect the intercept
-            X = X - X.mean(axis=0, keepdims=True)
-            Z[:, con_idxs] = ((Z[:, con_idxs] - Z[:, con_idxs].mean(axis=0, keepdims=True))
-                                  /Z[:, con_idxs].std(axis=0, keepdims=True))
+            self.Xmean = X.mean(axis=0, keepdims=True)
+            self.Zmean = Z.mean(axis=0, keepdims=True)
+            self.Zstd = Z.std(axis=0, keepdims=True)
+            X = X - self.Xmean
+            Z[:, con_idxs] = ((Z[:, con_idxs] - self.Zmean[:, con_idxs])
+                                  /self.Zstd[:, con_idxs])
         self.X, self.Y, self.Z = X, Y, Z
         self.data_params.n = X.shape[0]
         self.data_params.npts = X.shape[-1]
@@ -206,6 +215,33 @@ class HDFOpt():
             SIS_basis_mat = torch.tensor(self.obt_bsp(xs, self.SIS_params.SIS_basis_N, self.SIS_params.SIS_basis_ord))
             self.SIS_basis_mat = SIS_basis_mat.to(torch.get_default_dtype())
         self.basis_mat = torch.tensor(self.obt_bsp(xs, self.bsp_params.N, self.bsp_params.basis_ord)).to(torch.get_default_dtype())
+        
+    def predict(self, Xtest, Ztest):
+        """
+        Args:
+            Xtest (torch.Tensor): The functional part, a tensor with shape (num_sub, num_roi, num_pts).
+            Ztest (torch.Tensor): The covariates, a tensor of shape (num_sub, num_covs).
+        """
+        assert self.est_alp is not None, "fit a model first"
+        con_idxs = self.con_idxs
+        # Standardize Z and center Y and X across subjects
+        if self.is_std_data:
+            Xtest = Xtest - self.Xmean
+            Ztest[:, con_idxs] = ((Ztest[:, con_idxs] - self.Zmean[:, con_idxs])
+                                  /self.Zstd[:, con_idxs])
+        est_alp = self.est_alp
+        est_Gam = self.est_Gam
+        if isinstance(self.model_params["ws"], str):
+            ws = gen_int_ws(Xtest.shape[-1], self.model_params["ws"])
+        else:
+            ws = self.model_params["ws"] 
+
+        Ytest_est = obt_lin_tm(Ztest, Xtest[:, self.keep_idxs], est_alp, est_Gam, self.basis_mat, ws=ws)
+        if self.model_type.startswith("linear"):
+            return (Ytest_est + self.Ymean).numpy()
+        elif self.model_type.startswith("logi"):
+            return logit_fn(Ytest_est.numpy())
+
         
     def _fit(self, lam, N, X, Y, Z, is_cv=False, is_pbar=True):
         """
@@ -374,7 +410,7 @@ class HDFOpt():
         self.conv_iter = self.opt_res.conv_iter
         return self.opt_res
     
-    def get_cv_est(self, num_cv_fold=5):
+    def get_cv_est(self, num_cv_fold=5, is_shuffle=False):
         """
         Get CV estimate for each Y
         """
@@ -388,7 +424,9 @@ class HDFOpt():
         
         num_test = int(n/num_cv_fold)
         full_idx = np.arange(n)
-        test_Y_est_all = []
+        if is_shuffle: 
+            np.random.shuffle(full_idx)
+        test_Y_est_all = np.zeros(n)
         if self.verbose >= 2:
             prg_bar = trange(num_cv_fold, desc="Cross Validation")
         else:
@@ -398,7 +436,7 @@ class HDFOpt():
             test_idx = full_idx[(ix*num_test):(ix*num_test+num_test)]
             if ix == num_cv_fold-1:
                 test_idx = full_idx[(ix*num_test):] # including all remaining data
-            train_idx = np.delete(full_idx, test_idx)
+            train_idx = np.setdiff1d(full_idx, test_idx) 
             
             test_set_X = self.X[test_idx]
             test_set_Y = self.Y[test_idx]
@@ -426,11 +464,12 @@ class HDFOpt():
             est_Gam = cv_res.Gamk
             test_Y_est = obt_lin_tm(test_set_Z, test_set_X[:, cur_keep_idxs], est_alp, est_Gam, self.basis_mat, ws=ws)
             if self.model_type.startswith("linear"):
-                test_Y_est_all.append(test_Y_est.numpy())
+                test_Y_est_all[test_idx] = test_Y_est.numpy()
             elif self.model_type.startswith("logi"):
-                test_Y_est_all.append(logit_fn(test_Y_est.numpy()))
+                test_Y_est_all[test_idx] = logit_fn(test_Y_est.numpy())
+                #pdb.set_trace()
                 
-        self.cv_Y_est = np.concatenate(test_Y_est_all)
+        self.cv_Y_est = test_Y_est_all
         return self.cv_Y_est
     
     def _prepare_hypotest(self):

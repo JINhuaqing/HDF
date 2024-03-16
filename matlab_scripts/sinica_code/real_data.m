@@ -3,8 +3,8 @@
 % Let me currently suspend the real data to wait my simulation results
 clear all;
 % always use this working directory
-% cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
-cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
+cd /data/rajlab1/user_data/jin/MyResearch/HDF_infer/matlab_scripts/
+% cd '/Users/hujin/Library/CloudStorage/OneDrive-UCSF/Documents/ProjectCode/HDF/matlab_scripts'
 
 addpath sinica_code/my_own/
 addpath sinica_code/dantizig/
@@ -16,25 +16,24 @@ addpath sinica_code/useful_fns/
 sn_upper = 30; % upper bd of sn
 
 %% 1.1 path
-% seed 0 1 X is PSD
-% seed 2 3 X is random noise (Gaussian)
 data_folder = '../mid_results/matlab_real_data/';
-data_prefix = 'psd100'; % psd40, 89 or 100
+data_prefix = 'psd_matlab_1-45'; % 
 fil_name = [data_folder data_prefix '.mat'];
 cur_data = load(fil_name);
+save_folder_name = ['real_data' data_prefix]; 
 
 % m: equally spaced points on [a,b]
 [n, pn, m] = size(cur_data.X_centered);
 
 %% 1.2 Dantizig
-folds_d=5;
-lams_d = lamdaseq(0, 0.4, 20); % lam seqs for dantizig
+folds_d=10;
+lams_d = lamdaseq(0, 16, 17); % lam seqs for dantizig
 
 %% 1.3 eta estimate
-sns = 10:3:sn_upper; % candidate seq of sn
-folds=5;
-upper=10;
-n_lam =20;
+sns = 1:3:sn_upper; % candidate seq of sn
+folds=10;
+upper=16;
+n_lam =17;
 lams_eta =lamdaseq(0,upper,n_lam); % lam seq for eta
 
 a=0; b=1; % the funcitional curve is defined on [a,b]=[0,1]
@@ -128,7 +127,9 @@ errs = zeros(1, 29);
 % plot(errs, corrs, "Marker", "o", "LineStyle", "none")
 %}
 
-
+parpool(25)
+parfor roi_ix = 1:pn
+Hn = [roi_ix]
 %% 3 Simulation
 %% 3.1 Get optimal sn and lam for eta 
 CV1=zeros(length(sns),n_lam); 
@@ -136,7 +137,7 @@ opt_lam_idx =0;  %optimal lamda idx for eta estimator
 opt_sn =0;  %optimal number of bspline basis functions sn
 
 for sn_idx=1:length(sns)  %row of CV1
-    sn = sns(sn_idx)
+    sn = sns(sn_idx);
     G=sort(repmat(1:pn,1,sn));
     Theta1=cell(1,pn);
     for j=1:pn
@@ -235,47 +236,50 @@ end
 
 
 %% Hypotheis test
-Hns = cell(pn, 1);
-for i = 1:pn
-    %this is the cell(1,d) specifying the null hypothesis, in row vectors, [1,2] means H0:beta1=beta2=0
-    Hns{i} = [i];
-end
 N=200000; %we assume to have N=1000 bootstrap sample size
 alpha=0.05;% we assume alpha'th quantile
 
-pvals = zeros(pn, 1);
-for Hn_idx = 1:length(Hns)
-    Hn = Hns{Hn_idx}
-    Hnc=sort(setdiff(1:pn,Hn));
-    Thetaa=cell2mat(M7);%
-    Gamma=cell2mat(M6);
-    hn=size(Hn,2); % hn
-    G=sort(repmat(1:pn,1,opt_sn));
-    Thetaa1=cell(1,hn);      %This is Theta_{Hn} matrix
-    Gamma1=cell(1,hn);      %This is Gamma_{Hn} in the form of a cell(1,hn) quantity,whose j'th elemrnent is a 1 by opt_sn vector row
-    for j=1:hn
-        Thetaa1{j}=Thetaa(:,G==Hn(j));
-        Gamma1{j}=Gamma(:,G==Hn(j));  %% diag(sqrt(cell2mat(Gamma1)))=\hat{\Gamma}_{Hn}
-    end
-    Thetaa11=cell2mat(Thetaa1); % \theta_{Hn}=[E_1,..E_i,.., E_n]' is n by hn*opt_sn matrix  in matrix form, the i'th row of the matrix=Ei'
-    Thetaa2=cell(1,pn-hn);   %This is Theta_{Hn^c}
-    etaHnc=cell(pn-hn,1);     %This is the \hat{eta}_{Hn^c} in cell form
-    for j=1:(pn-hn)
-        Thetaa2{j}=Thetaa(:,G==Hnc(j));
-        etaHnc{j}=eta11(G==Hnc(j),:);  %% cell2mat(etaHnc)=\hat{eta}_{Hn^c}
-    end
-    Thetaa22=cell2mat(Thetaa2); % \theta_{Hnc}=[F_1,..F_i,.., F_n]' is n by (pn-hn)*opt_sn matrix  in matrix form
-    [MD,lamdaopt]=dantizig2(Hn,M7,n,opt_sn,lams_d,cv_idxs_d);%MD is the hn*sn by (pn-hn)sn matrix=(\hat{w})'on page 4 of paper
-    S=cell(1,n); %S{i}=\hat{S}_i
-    for i=1:n
-        S{i}=n^(-1/2)*(inv(diag(sqrt(cell2mat(Gamma1)))))*(MD*(Thetaa22(i,:))'-(Thetaa11(i,:))')*(y(i)-Thetaa22(i,:)*cell2mat(etaHnc));
-    end
-    %%Next we begin wild bootstrap
-    [pval, CV, TT] =mywild(alpha,N,S); [pval CV TT] %%output of the test
-    pvals(Hn_idx) = pval;
+Hnc=sort(setdiff(1:pn,Hn));
+Thetaa=cell2mat(M7);%
+Gamma=cell2mat(M6);
+hn=size(Hn,2); % hn
+G=sort(repmat(1:pn,1,opt_sn));
+Thetaa1=cell(1,hn);      %This is Theta_{Hn} matrix
+Gamma1=cell(1,hn);      %This is Gamma_{Hn} in the form of a cell(1,hn) quantity,whose j'th elemrnent is a 1 by opt_sn vector row
+for j=1:hn
+    Thetaa1{j}=Thetaa(:,G==Hn(j));
+    Gamma1{j}=Gamma(:,G==Hn(j));  %% diag(sqrt(cell2mat(Gamma1)))=\hat{\Gamma}_{Hn}
 end
+Thetaa11=cell2mat(Thetaa1); % \theta_{Hn}=[E_1,..E_i,.., E_n]' is n by hn*opt_sn matrix  in matrix form, the i'th row of the matrix=Ei'
+Thetaa2=cell(1,pn-hn);   %This is Theta_{Hn^c}
+etaHnc=cell(pn-hn,1);     %This is the \hat{eta}_{Hn^c} in cell form
+for j=1:(pn-hn)
+    Thetaa2{j}=Thetaa(:,G==Hnc(j));
+    etaHnc{j}=eta11(G==Hnc(j),:);  %% cell2mat(etaHnc)=\hat{eta}_{Hn^c}
+end
+Thetaa22=cell2mat(Thetaa2); % \theta_{Hnc}=[F_1,..F_i,.., F_n]' is n by (pn-hn)*opt_sn matrix  in matrix form
+[MD,lamdaopt]=dantizig2(Hn,M7,n,opt_sn,lams_d,cv_idxs_d);%MD is the hn*sn by (pn-hn)sn matrix=(\hat{w})'on page 4 of paper
+S=cell(1,n); %S{i}=\hat{S}_i
+for i=1:n
+    S{i}=n^(-1/2)*(inv(diag(sqrt(cell2mat(Gamma1)))))*(MD*(Thetaa22(i,:))'-(Thetaa11(i,:))')*(y(i)-Thetaa22(i,:)*cell2mat(etaHnc));
+end
+%%Next we begin wild bootstrap
+[pval, CV, TT] =mywild(alpha,N,S); [pval CV TT] %%output of the test
 
 opt_lam = lams_eta(opt_lam_idx);
-save(['/Users/hujin/ProjectCode/HDF/results/sinica_results/' ...
-       data_prefix '_pvals.mat'],  ...
-      'pvals', 'opt_eta_est', 'opt_lam', 'opt_sn');
+result = struct;
+result.pval = pval;
+result.TT = TT;
+result.CV = CV;
+result.opt_eta_est = opt_eta_est;
+result.opt_lam = opt_lam;
+result.opt_lam_d = lamdaopt;
+result.opt_sn = opt_sn;
+
+save_folder = ['../results/sinica_results/' save_folder_name];
+if ~exist(save_folder', 'dir')
+    mkdir(save_folder)
+end
+parsave([save_folder '/roi' num2str(roi_ix) '_res.mat'],  result)
+end
+delete(gcp('nocreate'));

@@ -50,7 +50,6 @@ from joblib import Parallel, delayed
 
 import argparse
 parser = argparse.ArgumentParser(description='run')
-parser.add_argument('--N', type=int, help='Bspline basis') 
 args = parser.parse_args()
 
 # In[6]:
@@ -100,6 +99,7 @@ outlier_idxs = outlier_idxs.astype(int)
 raw_X = np.concatenate([AD_PSD.PSDs, ctrl_PSD.PSDs]); #n x d x npts
 X_dB = 10*np.log10(raw_X);
 outlier_idxs2 = np.where(X_dB.mean(axis=(1, 2))<0)
+#X = (X_dB - X_dB.mean(axis=-1, keepdims=1))/X_dB.std(axis=-1, keepdims=1)
 X = X_dB
 
 Y = np.array(baseline["MMSE"])[:X.shape[0]];
@@ -139,10 +139,14 @@ X = X/X.mean()
 print(X.shape, Y.shape, Z.shape)
 
 all_data = edict()
-all_data.X = torch.tensor(X)
-#all_data.X = torch.tensor(X+np.random.randn(*X.shape)*0.1)
+if SAVED_FOLDER.endswith("X1err"):
+    all_data.X = torch.tensor(X+np.random.randn(*X.shape)*0.1)
+else:
+    all_data.X = torch.tensor(X)
 all_data.Y = torch.tensor(Y)
 all_data.Z = torch.tensor(Z)
+
+sig_roi_idxs = load_pkl(RES_ROOT/f"{SAVED_FOLDER}/sig_roi_idxs.pkl");
 
 
 from easydict import EasyDict as edict
@@ -162,7 +166,6 @@ base_params.SIS_params = edict({"SIS_pen": 0.02, "SIS_basis_N":8, "SIS_ws":"simp
 base_params.opt_params.beta = 1
 base_params.bsp_params.is_orth_basis = True
 base_params.can_lams = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]
-#base_params.can_lams = [0.01, 0.1, 0.4, 0.8, 1.2, 1.6, 3.2]
 
 
 setting = edict(deepcopy(base_params))
@@ -180,16 +183,16 @@ if not save_dir.exists():
     save_dir.mkdir(exist_ok=True)
 
 
-def _run_main_fn(roi_idx, lam, N, setting, is_save=False, is_cv=False, verbose=2):
+def _run_main_fn(lam, N, setting, is_save=False, is_cv=False, verbose=2):
     torch.set_default_dtype(torch.double)
         
     _setting = edict(setting.copy())
     _setting.lam = lam
     _setting.N = N
-    _setting.sel_idx = np.delete(np.arange(setting.data_params.d), [roi_idx])
+    _setting.sel_idx = np.delete(np.arange(setting.data_params.d), sig_roi_idxs)
     
     
-    f_name = f"roi_{roi_idx:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
+    f_name = f"sigroi-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
     
     
     if not (save_dir/f_name).exists():
@@ -231,9 +234,9 @@ def _run_main_fn(roi_idx, lam, N, setting, is_save=False, is_cv=False, verbose=2
 
 
 setting.opt_params.max_iter = 5000
-all_coms = itertools.product(range(0, setting.data_params.d), setting.can_lams)
-with Parallel(n_jobs=35) as parallel:
-    ress = parallel(delayed(_run_main_fn)(roi_idx=roi_idx, lam=lam, N=args.N, setting=setting, is_save=True, is_cv=True, verbose=1) for roi_idx, lam
-                    in tqdm(all_coms, total=len(setting.can_lams)*setting.data_params.d))
+all_coms = itertools.product(setting.can_lams, setting.can_Ns)
+with Parallel(n_jobs=10) as parallel:
+    ress = parallel(delayed(_run_main_fn)(lam=lam, N=N, setting=setting, is_save=True, is_cv=True, verbose=1) for lam, N
+                    in tqdm(all_coms, total=len(setting.can_lams)*len(setting.can_Ns)))
 
 

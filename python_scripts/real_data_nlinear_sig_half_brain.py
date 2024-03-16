@@ -10,7 +10,6 @@ RUN_PYTHON_SCRIPT = False
 #OUTLIER_IDXS = dict(AD=[], ctrl=[])
 OUTLIER_IDXS = dict(AD=[49], ctrl=[14, 19, 30, 38])
 SAVED_FOLDER = "real_data_nlinear_nostd"
-#SAVED_FOLDER = "real_data_nlinear_nostd_X1err"
 DATA = ["AD88_matlab_1-45.pkl", "Ctrl92_matlab_1-45.pkl"]
 
 
@@ -140,7 +139,6 @@ print(X.shape, Y.shape, Z.shape)
 
 all_data = edict()
 all_data.X = torch.tensor(X)
-#all_data.X = torch.tensor(X+np.random.randn(*X.shape)*0.1)
 all_data.Y = torch.tensor(Y)
 all_data.Z = torch.tensor(Z)
 
@@ -161,8 +159,8 @@ base_params.can_Ns = [4, 6, 8, 10, 12, 14]
 base_params.SIS_params = edict({"SIS_pen": 0.02, "SIS_basis_N":8, "SIS_ws":"simpson"})
 base_params.opt_params.beta = 1
 base_params.bsp_params.is_orth_basis = True
-base_params.can_lams = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]
-#base_params.can_lams = [0.01, 0.1, 0.4, 0.8, 1.2, 1.6, 3.2]
+base_params.can_lams = [0.1,  0.3, 0.5,  0.7,  0.9, 1.1, 1.3]
+#base_params.can_lams = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4]
 
 
 setting = edict(deepcopy(base_params))
@@ -186,10 +184,10 @@ def _run_main_fn(roi_idx, lam, N, setting, is_save=False, is_cv=False, verbose=2
     _setting = edict(setting.copy())
     _setting.lam = lam
     _setting.N = N
-    _setting.sel_idx = np.delete(np.arange(setting.data_params.d), [roi_idx])
+    _setting.sel_idx = np.delete(np.arange(_setting.data_params.d), [roi_idx, roi_idx+34])
     
     
-    f_name = f"roi_{roi_idx:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
+    f_name = f"hbroi_{roi_idx:.0f}-lam_{lam*1000:.0f}-N_{N:.0f}_fit.pkl"
     
     
     if not (save_dir/f_name).exists():
@@ -225,15 +223,20 @@ def _run_main_fn(roi_idx, lam, N, setting, is_save=False, is_cv=False, verbose=2
 
 
 
+sig_roi_idxs = load_pkl(save_dir/f"sig_roi_idxs.pkl");
+hb_sig_roi_idxs = sig_roi_idxs.copy()
+hb_sig_roi_idxs[sig_roi_idxs>=34] = sig_roi_idxs[sig_roi_idxs>=34] - 34
+hb_sig_roi_idxs = np.sort(np.unique(hb_sig_roi_idxs))
+print(hb_sig_roi_idxs)
 
 
 # In[37]:
 
 
 setting.opt_params.max_iter = 5000
-all_coms = itertools.product(range(0, setting.data_params.d), setting.can_lams)
+all_coms = itertools.product(hb_sig_roi_idxs, setting.can_lams)
 with Parallel(n_jobs=35) as parallel:
     ress = parallel(delayed(_run_main_fn)(roi_idx=roi_idx, lam=lam, N=args.N, setting=setting, is_save=True, is_cv=True, verbose=1) for roi_idx, lam
-                    in tqdm(all_coms, total=len(setting.can_lams)*setting.data_params.d))
+                    in tqdm(all_coms, total=len(setting.can_lams)*len(hb_sig_roi_idxs)))
 
 
